@@ -107,7 +107,7 @@ Read the [runtime contract](plugins/pstack-for-codex/CODEX-RUNTIME.md) for execu
 
 ### Follow validated updates on main
 
-A [GitHub Action](.github/workflows/sync-upstream.yml) checks pstack upstream daily at **04:17 UTC** and supports manual runs. It merges compatible upstream changes with the Codex adaptations, runs validation, increments the plugin version, and commits to `main`. Conflicts, unsupported instructions, or validation failures stop publication. The synchronizer requires no AI API key and does not execute upstream helper code.
+A [GitHub Action](.github/workflows/sync-upstream.yml) checks pstack upstream daily at **04:17 UTC** and supports manual runs. It merges compatible upstream changes with the Codex adaptations, runs validation, increments the plugin patch version, and commits to `main`. It then publishes a matching GitHub release: version `1.0.2` becomes tag `v1.0.2`, with release notes, a ZIP snapshot, and a SHA-256 checksum. Conflicts, unsupported instructions, or validation failures stop publication. The synchronizer requires no AI API key and does not execute upstream helper code.
 
 Refresh your installation:
 
@@ -122,7 +122,7 @@ Start a new session after updating. GitHub may delay scheduled runs and disables
 
 [Releases](https://github.com/LeonardSEO/pstack-for-codex/releases) provide tagged snapshots and release notes. For a fresh installation pinned to this release, replace `--ref main` in the installation command with `--ref v1.0.1`. A pinned marketplace stays on that ref until you change it.
 
-The v1.0.1 release includes a ZIP archive and a SHA-256 checksum. The marketplace commands above are the recommended installation route. Daily sync commits on `main` do not automatically create GitHub releases.
+Each automated release includes a ZIP archive and a SHA-256 checksum. The marketplace commands above are the recommended installation route. Runs without upstream changes do not increase the version. After validation, the workflow ensures the current version has a release, skips an already published release, and can finish a draft left by an interrupted upload. Assets are uploaded before the release becomes public.
 
 ### The additional review skill stays independent
 

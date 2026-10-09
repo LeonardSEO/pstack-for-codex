@@ -57,3 +57,8 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'chore: sync upstream pstack with Codex adaptations'
           git push origin HEAD:main
+      - name: Publish the validated plugin version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash scripts/release.sh
