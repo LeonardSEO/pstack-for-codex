@@ -1,0 +1,8 @@
+interface:
+  display_name: Correct
+  short_description: Find the mistakes agents keep repeating in this repo and make
+    each one impossible
+  default_prompt: Use $correct for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

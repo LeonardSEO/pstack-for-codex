@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "pstack-for-codex",
+  "version": "1.0.0",
+  "description": "Codex adaptation of pstack engineering principles, playbooks, reviews and verification workflows.",
+  "author": {
+    "name": "Leonard van Hemert"
+  },
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "pstack for Codex",
+        "shortDescription": "Rigorous engineering workflows",
+        "longDescription": "A Codex adaptation of Lauren Tan\u2019s MIT-licensed pstack. Includes all core skills, principles, playbooks and role prompts. Uses available native tools, inherited models and explicit sequential fallbacks. No Cursor automation, MCP server or cloud runner is provisioned.",
+        "developerName": "Leonard van Hemert",
+        "category": "Developer Tools",
+        "logo": "./assets/logo.png",
+        "composerIcon": "./assets/logo.png",
+        "defaultPrompt": "Use pstack-for-codex:poteto-mode to investigate, implement and verify this task."
+      }
+    }
+  },
+  "homepage": "https://github.com/LeonardSEO/pstack-for-codex",
+  "repository": "https://github.com/LeonardSEO/pstack-for-codex"
+}

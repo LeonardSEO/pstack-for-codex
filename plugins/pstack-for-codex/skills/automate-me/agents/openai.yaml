@@ -1,0 +1,8 @@
+interface:
+  display_name: Automate Me
+  short_description: Use for "automate me", "create/update/refresh my -mode skill",
+    "turn/capture my preference
+  default_prompt: Use $automate-me for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

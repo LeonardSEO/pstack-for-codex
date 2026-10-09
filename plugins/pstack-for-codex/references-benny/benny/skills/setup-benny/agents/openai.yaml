@@ -1,0 +1,7 @@
+interface:
+  display_name: Setup Benny
+  short_description: Configure Benny and prepare its triage and repro automations
+  default_prompt: Use $setup-benny for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

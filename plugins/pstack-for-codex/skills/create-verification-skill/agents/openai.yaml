@@ -1,0 +1,8 @@
+interface:
+  display_name: Create Verification Skill
+  short_description: "Generate a project-local verification skill that drives your\
+    \ app the way a user does \u2014 any"
+  default_prompt: Use $create-verification-skill for the requested task, following
+    the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

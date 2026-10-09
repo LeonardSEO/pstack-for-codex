@@ -1,0 +1,8 @@
+interface:
+  display_name: Interrogate
+  short_description: Use for "interrogate", "adversarial review", "independent-run
+    review", "challenge this", "
+  default_prompt: Use $interrogate for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,8 @@
+interface:
+  display_name: Architect
+  short_description: Sketch types, signatures, and module structure before code, then
+    stay in the loop while im
+  default_prompt: Use $architect for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

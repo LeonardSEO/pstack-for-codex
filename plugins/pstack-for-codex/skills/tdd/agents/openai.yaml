@@ -1,0 +1,7 @@
+interface:
+  display_name: Tdd
+  short_description: Use only when the user explicitly asks for TDD, a failing test,
+    or a regression test, OR w
+  default_prompt: Use $tdd for the requested task, following the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

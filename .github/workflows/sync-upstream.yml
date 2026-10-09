@@ -1,0 +1,59 @@
+name: Sync upstream pstack
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-upstream-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Install sync dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Test the trusted synchronizer
+        run: python -m unittest discover -s tests -v
+      - name: Read upstream history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: cursor/plugins
+          ref: main
+          path: .upstream
+          fetch-depth: 0
+          sparse-checkout: pstack
+          persist-credentials: false
+      - name: Merge upstream with Codex adaptations
+        run: python scripts/sync_upstream.py --upstream-dir .upstream
+      - name: Validate before publication
+        run: python scripts/validate.py
+      - name: Commit compatible changes directly to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- plugins/pstack-for-codex upstream.json
+          if git diff --cached --quiet; then
+            echo "No upstream changes to publish."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: sync upstream pstack with Codex adaptations'
+          git push origin HEAD:main

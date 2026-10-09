@@ -1,0 +1,8 @@
+interface:
+  display_name: Blast Radius
+  short_description: 'Find what a change could break somewhere else before it ships,
+    beyond the diff, and prove '
+  default_prompt: Use $blast-radius for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

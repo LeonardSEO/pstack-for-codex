@@ -1,0 +1,8 @@
+interface:
+  display_name: Make Bot Ui
+  short_description: 'Use when building a custom UI (page, dashboard, buttons) that
+    should wake a Grok Bot over '
+  default_prompt: Use $make-bot-ui for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

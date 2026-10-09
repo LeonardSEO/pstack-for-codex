@@ -1,0 +1,8 @@
+interface:
+  display_name: Benchmark Checklist
+  short_description: Vet a perf measurement (limiter, tuning, limits, errors, repeatability,
+    relevance, and whe
+  default_prompt: Use $benchmark-checklist for the requested task, following the Codex
+    runtime contract.
+policy:
+  allow_implicit_invocation: false

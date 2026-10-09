@@ -1,0 +1,8 @@
+interface:
+  display_name: Technical Writing
+  short_description: "Layered technical-writing standard: Di\xE1taxis structure, Google\
+    \ developer style sentences, "
+  default_prompt: Use $technical-writing for the requested task, following the Codex
+    runtime contract.
+policy:
+  allow_implicit_invocation: false

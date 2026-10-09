@@ -1,0 +1,8 @@
+interface:
+  display_name: Principle Explain The Number
+  short_description: 'Apply before you trust, report, or act on a number you measured:
+    a speedup, a regression, '
+  default_prompt: Use $principle-explain-the-number for the requested task, following
+    the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

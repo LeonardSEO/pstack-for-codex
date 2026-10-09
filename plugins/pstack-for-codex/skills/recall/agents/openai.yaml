@@ -1,0 +1,8 @@
+interface:
+  display_name: Recall
+  short_description: Reconstruct your recent working context from your own chat history,
+    live state, and the sh
+  default_prompt: Use $recall for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

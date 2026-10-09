@@ -1,0 +1,7 @@
+interface:
+  display_name: Principle Redesign From First Principles
+  short_description: Apply when integrating a new requirement into an existing design
+  default_prompt: Use $principle-redesign-from-first-principles for the requested
+    task, following the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

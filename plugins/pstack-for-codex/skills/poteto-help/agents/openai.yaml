@@ -1,0 +1,8 @@
+interface:
+  display_name: Poteto Help
+  short_description: Guides users through pstack setup, /poteto-mode, and picking
+    the skill, playbook, or princ
+  default_prompt: Use $poteto-help for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

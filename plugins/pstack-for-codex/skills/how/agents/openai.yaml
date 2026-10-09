@@ -1,0 +1,7 @@
+interface:
+  display_name: How
+  short_description: Use for "how does X work", code walkthroughs before changing
+    something, and placement / ow
+  default_prompt: Use $how for the requested task, following the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,8 @@
+interface:
+  display_name: Principle Encode Lessons In Structure
+  short_description: Apply when you catch yourself writing the same instruction a
+    second time, or notice a recu
+  default_prompt: Use $principle-encode-lessons-in-structure for the requested task,
+    following the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

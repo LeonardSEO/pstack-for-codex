@@ -1,0 +1,8 @@
+interface:
+  display_name: Setup Pstack
+  short_description: Configure which models pstack uses per role and at what reasoning
+    budget
+  default_prompt: Use $setup-pstack for the requested task, following the Codex runtime
+    contract.
+policy:
+  allow_implicit_invocation: false

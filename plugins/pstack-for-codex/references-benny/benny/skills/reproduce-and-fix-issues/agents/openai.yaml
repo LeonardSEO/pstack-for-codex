@@ -1,0 +1,8 @@
+interface:
+  display_name: Reproduce And Fix Issues
+  short_description: Reproduce triaged Slack bugs through a configured app-control
+    adapter, verify existing fix
+  default_prompt: Use $reproduce-and-fix-issues for the requested task, following
+    the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

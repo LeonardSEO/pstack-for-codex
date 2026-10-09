@@ -1,0 +1,7 @@
+interface:
+  display_name: Teach
+  short_description: Explain a body of work plainly so a person actually understands
+    it
+  default_prompt: Use $teach for the requested task, following the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

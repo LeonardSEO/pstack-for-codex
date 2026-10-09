@@ -1,0 +1,7 @@
+interface:
+  display_name: Arena
+  short_description: Spawn N parallel candidates at the same task, pick a base, graft
+    the strongest parts of th
+  default_prompt: Use $arena for the requested task, following the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

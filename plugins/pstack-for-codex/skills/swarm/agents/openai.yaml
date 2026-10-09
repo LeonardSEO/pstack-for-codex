@@ -1,0 +1,6 @@
+interface:
+  display_name: Swarm
+  short_description: Fan out N parallel workers, drain them, and return one report
+  default_prompt: Use $swarm for the requested task, following the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false

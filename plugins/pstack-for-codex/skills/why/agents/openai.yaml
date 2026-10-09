@@ -1,0 +1,7 @@
+interface:
+  display_name: Why
+  short_description: Use for 'why does X work this way', 'why we picked Y', design
+    rationale, regressions, post
+  default_prompt: Use $why for the requested task, following the Codex runtime contract.
+policy:
+  allow_implicit_invocation: false
