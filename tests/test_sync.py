@@ -88,4 +88,34 @@ class SyncTests(unittest.TestCase):
         from sync_upstream import SyncConflict
         with self.assertRaises(SyncConflict):self.run_sync(self.commit())
 
+    def test_independent_review_survives_pstack_add_edit_and_delete(self):
+        name = 'skills/thermo-nuclear-code-quality-review'
+        protected = {
+            name + '/SKILL.md': 'independent Codex review\n',
+            name + '/agents/openai.yaml': 'independent invocation metadata\n',
+            'LICENSE-cursor-team-kit': 'Cursor MIT attribution\n',
+        }
+        for path, text in protected.items():
+            target = self.plugin / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text)
+        for action in ['add', 'edit', 'delete']:
+            with self.subTest(action=action):
+                if action == 'delete':
+                    (self.upstream / 'pstack' / name / 'SKILL.md').unlink()
+                    (self.upstream / 'pstack' / name / 'agents/openai.yaml').unlink()
+                else:
+                    self.file(name + '/SKILL.md', f'pstack {action}\n')
+                    self.file(name + '/agents/openai.yaml', f'pstack metadata {action}\n')
+                # A real update elsewhere ensures the full synchronization runs.
+                self.file('skills/example/reference.md', f'first\nsecond\n{action}\n')
+                self.assertTrue(self.run_sync(self.commit()))
+                for path, text in protected.items():
+                    self.assertEqual((self.plugin / path).read_text(), text)
+
+    def test_only_same_name_upstream_skill_does_not_trigger_sync(self):
+        self.file('skills/thermo-nuclear-code-quality-review/SKILL.md', 'upstream collision\n')
+        self.assertFalse(self.run_sync(self.commit()))
+        self.assertEqual(json.loads((self.repo / 'upstream.json').read_text())['commit'], self.old)
+
 if __name__ == '__main__':unittest.main()

@@ -1,6 +1,6 @@
 # Pstack for Codex
 
-Codex adaptation of [Lauren Tan’s pstack](https://github.com/cursor/plugins/tree/main/pstack). Includes 51 skills, 23 playbooks, engineering principles and verification workflows.
+Codex adaptation of [Lauren Tan’s pstack](https://github.com/cursor/plugins/tree/main/pstack). Includes 51 pstack skills plus the independently maintained `thermo-nuclear-code-quality-review` skill, 23 playbooks, engineering principles and verification workflows.
 
 ## Install
 
@@ -10,6 +10,8 @@ codex plugin add pstack-for-codex@leonardseo-pstack
 ```
 
 Start a new Codex session and use `$poteto-mode` with your task and a checkable completion criterion. Native agents are used when available and permitted; otherwise phases run sequentially. The current Codex model is inherited by default.
+
+For a strict structural and maintainability audit, invoke `$thermo-nuclear-code-quality-review` explicitly. This skill is imported from [Cursor's cursor-team-kit](https://github.com/cursor/plugins/blob/main/cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md), with Codex runtime and invocation metadata. Its directory is excluded from pstack synchronization, including same-name additions, edits and deletions upstream. Updates to this additional skill are manual. Cursor's MIT attribution is preserved in [LICENSE-cursor-team-kit](plugins/pstack-for-codex/LICENSE-cursor-team-kit).
 
 ## Updates
 

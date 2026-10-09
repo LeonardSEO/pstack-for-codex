@@ -9,6 +9,11 @@ from pathlib import Path, PurePosixPath
 import yaml
 
 
+# This cursor-team-kit import is maintained separately from pstack, even if
+# pstack later introduces or removes a skill with the same name.
+PRESERVED_SKILL_PATH = 'skills/thermo-nuclear-code-quality-review'
+
+
 class SyncConflict(RuntimeError):
     pass
 
@@ -29,6 +34,8 @@ def snapshot(repo, ref):
         metadata, path = entry.split(b'\t', 1)
         mode, kind, oid = metadata.split()
         name = path.decode('utf-8')
+        if name == PRESERVED_SKILL_PATH or name.startswith(PRESERVED_SKILL_PATH + '/'):
+            continue
         if mode not in (b'100644', b'100755') or kind != b'blob':
             raise SyncConflict(f'Unsupported upstream file mode: {name}')
         if '..' in PurePosixPath(name).parts or name.startswith('/'):

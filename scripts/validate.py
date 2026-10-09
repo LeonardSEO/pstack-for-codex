@@ -28,6 +28,8 @@ def validate(root):
     assert entry['source'] == {'source': 'local', 'path': './plugins/pstack-for-codex'}
     skills = list((plugin / 'skills').glob('*/SKILL.md'))
     assert skills
+    assert (plugin / 'skills/thermo-nuclear-code-quality-review/SKILL.md').is_file(), 'Required independent review skill is missing'
+    assert 'Copyright (c) 2026 Cursor' in (plugin / 'LICENSE-cursor-team-kit').read_text()
     for path in skills:
         front = yaml.safe_load(path.read_text().split('---', 2)[1])
         assert set(front) == {'name', 'description'}, path
