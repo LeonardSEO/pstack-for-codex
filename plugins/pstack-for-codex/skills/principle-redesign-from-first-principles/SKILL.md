@@ -1,8 +1,6 @@
 ---
 name: principle-redesign-from-first-principles
-description: Apply when integrating a new requirement into an existing design. Redesign
-  as if the requirement had been a foundational assumption from day one, instead of
-  bolting it on.
+description: Apply when integrating a new requirement into an existing design.
 ---
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
@@ -10,7 +8,7 @@ Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workf
 
 # Redesign From First Principles
 
-When integrating a change, don't bolt it onto the existing design. Redesign as if the requirement had been there from the start.
+When integrating a change, don't bolt it onto the existing design. Redesign as if the requirement had been a foundational assumption from the start.
 
 - Read all affected files and understand the current design
 - Ask: "if we were writing this from scratch with this new requirement, what would we build?"

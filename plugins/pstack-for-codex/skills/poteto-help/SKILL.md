@@ -18,6 +18,8 @@ Use pstack-for-codex:poteto-mode to reproduce this bug, fix its root cause, and 
 
 No setup is required for inherited-model defaults. [setup-pstack](../setup-pstack/SKILL.md) writes project preferences loaded explicitly by poteto-mode. The host, not this plugin, controls available models and tools.
 
+Use [ketchup](../ketchup/SKILL.md) to catch up on this chat since the user’s last message, with enough context to decide each action item. Recall covers recent work across chats when the host exposes that history.
+
 Route explanations to how, motivation/history to why, design to architect, competing attempts to arena, coverage slices to swarm, adversarial review to interrogate, bug-test-first work to tdd, comments to no-comments, prose to unslop, and runtime harness creation to create-verification-skill. Read their frontmatter when a finer distinction matters. Principles are the principle-* sibling skills. Playbooks live in [poteto-mode/playbooks](../poteto-mode/playbooks/); they are not separate commands.
 
 Native agents are conditional on the host's capabilities and rules. Without them, phases run sequentially. Inherited-model review is not model diversity. No cloud runner, scheduler, connector, webhook or browser is installed by this plugin. External tools remain independently configured. Source attribution and conversion limitations are in [the compatibility report](../../COMPATIBILITY.md).
