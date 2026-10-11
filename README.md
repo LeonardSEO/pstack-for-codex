@@ -9,7 +9,7 @@
 [![Latest release](https://img.shields.io/github/v/release/LeonardSEO/pstack-for-codex)](https://github.com/LeonardSEO/pstack-for-codex/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-An independent Codex adaptation of [Lauren Tan’s pstack](https://github.com/cursor/plugins/tree/main/pstack), with 51 core skills, 23 playbooks, and an additional **Thermo-Nuclear Code Quality Review**. Start with a goal and a checkable completion criterion. The workflows guide your agent through understanding the code, choosing an approach, making the change, and reporting evidence.
+An independent Codex adaptation of [Lauren Tan’s pstack](https://github.com/cursor/plugins/tree/main/pstack), with 52 core skills, 23 playbooks, and an additional **Thermo-Nuclear Code Quality Review**. Start with a goal and a checkable completion criterion. The workflows guide your agent through understanding the code, choosing an approach, making the change, and reporting evidence.
 
 [Install](#install) · [Examples](#start-with-a-real-task) · [Skills](#choose-a-workflow) · [Updates](#updates-and-releases) · [Compatibility](#how-it-runs-in-codex)
 
@@ -140,7 +140,11 @@ python3 -m unittest discover -s tests -v
 python3 scripts/validate.py
 ```
 
-The sync uses the commit in [`upstream.json`](upstream.json) as its merge base. Resolve blocked changes while preserving the runtime contract, then advance the checkpoint only after validation. Package checks validate metadata, local skill links, and compatibility rules; they do not prove every workflow or external integration works in your environment.
+The sync uses the commit in [`upstream.json`](upstream.json) as its source base. It normalizes skill metadata and applies the reviewed Codex translations in [`scripts/codex_adaptations.json`](scripts/codex_adaptations.json) to both upstream revisions before merging with the live fork. This lets wording changes around translated instructions flow through while preserving separately maintained fork edits. The runtime contract and independent review skill remain maintained in this fork.
+
+Translations match exact source fragments, not fuzzy patterns. Unknown edits to a translated instruction, duplicate matches, conflicting fork edits, and unreviewed changes to complete Codex rewrites stop the sync. Complete rewrites and reviewed removal of obsolete instructions require the exact normalized source SHA-256. To extend the translations, compare both source revisions and the current fork, preserve the intended upstream behavior under the Codex runtime contract, and add a regression before accepting a new variant. Never generate a merge base from the current fork or add a blanket resolution for an entire skill.
+
+The synchronizer validates a staged copy of the complete proposed package before writing files, incrementing the saved version, or advancing the checkpoint. A repeated sync of the same source is a validated no-op. The workflow validates again before committing or releasing. Package checks validate metadata, local skill links, and compatibility rules; they do not prove every workflow or external integration works in your environment.
 
 ## Credits and license
 
