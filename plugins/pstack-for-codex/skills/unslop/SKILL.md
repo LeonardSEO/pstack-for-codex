@@ -1,6 +1,6 @@
 ---
 name: unslop
-description: Cut AI tells from any writing. Must always apply.
+description: Cut AI tells from any writing.
 ---
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.

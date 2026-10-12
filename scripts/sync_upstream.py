@@ -85,6 +85,8 @@ def adapt(data, name, adaptations, required=()):
     if SKILL_PATH.fullmatch(name):
         data = normalize_skill(data, name)
     entry = adaptations.get(name, {})
+    if entry.get('normalize_agent_name'):
+        data = normalize_agent_name(data, name)
     digest = hashlib.sha256(data).hexdigest()
     if 'reviewed_files' in entry:
         if digest not in entry['reviewed_files']:
@@ -117,6 +119,35 @@ def adapt(data, name, adaptations, required=()):
         end = stop
     rendered.append(data[end:])
     return b''.join(rendered), active
+
+
+def normalize_agent_name(data, name):
+    """Ignore only a reviewed role's single-line display name, not its policy.
+
+    Keep all other source bytes in the reviewed digest. Reject YAML constructs
+    that could hide another instruction or an ambiguous name declaration.
+    """
+    text = data.decode('utf-8')
+    parts = text.split('---', 2)
+    if len(parts) != 3 or parts[0].strip():
+        raise SyncConflict(f'Invalid agent frontmatter: {name}')
+    try:
+        front = yaml.safe_load(parts[1])
+    except yaml.YAMLError as error:
+        raise SyncConflict(f'Invalid agent frontmatter: {name}') from error
+    names = list(re.finditer(r'^name: ([^\r\n]+)$', parts[1], re.M))
+    if (not isinstance(front, dict) or not isinstance(front.get('name'), str)
+            or len(names) != 1):
+        raise SyncConflict(f'Invalid agent name: {name}')
+    raw_name = names[0].group(1)
+    # Only plain display names. Comments, tags, anchors and multiline values
+    # can contain additional instructions and must remain review failures.
+    if (not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 _-]*', raw_name)
+            or raw_name != front['name']):
+        raise SyncConflict(f'Invalid agent name: {name}')
+    parts[1] = (parts[1][:names[0].start()] + 'name: ' + PurePosixPath(name).stem
+                + parts[1][names[0].end():])
+    return '---'.join(parts).encode()
 
 
 def merge(current, base, incoming, name):

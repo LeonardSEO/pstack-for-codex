@@ -88,7 +88,7 @@ Continue authorized work within scope. The user's request and host policies gove
 
 ## Subagents
 
-Read CODEX-RUNTIME.md. Use available native delegation only when permitted. Engineering delegates read agents/poteto-agent.md and this skill; routed roles read their own reference prompts. Give each writer an isolated worktree or disjoint writable scope. Default to inherited model and reasoning effort. No hardcoded model families, cloud environments, named agent types or unsupported task flags.
+Read CODEX-RUNTIME.md. The chat that receives poteto-mode runs the playbook, owns the todo list and spawns its delegates. Never delegate the whole playbook to an engineering delegate. Use available native delegation only when permitted. Engineering delegates read agents/poteto-agent.md and this skill; routed roles read their own reference prompts. Give each writer an isolated worktree or disjoint writable scope. Default to inherited model and reasoning effort. No hardcoded model families, cloud environments, named agent types or unsupported task flags.
 
 When tools do not permit delegation, execute the same phases sequentially and label self-review honestly. A required independent shipping verdict remains blocked until an independent reviewer is available. Own and verify every delegated result. Fresh roles receive consolidated briefs; reuse a running agent only when it holds state that is costly to reconstruct.
 
