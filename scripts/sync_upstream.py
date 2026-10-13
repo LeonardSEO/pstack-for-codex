@@ -75,6 +75,28 @@ def normalize_skill(data, name):
     return f'---\n{header}\n---\n\n{body}'.encode()
 
 
+def canonical_source(data, name, entry):
+    if SKILL_PATH.fullmatch(name):
+        data = normalize_skill(data, name)
+    if entry.get('normalize_agent_name') or entry.get('role'):
+        data = normalize_agent_name(data, name)
+    return data
+
+
+def derive_role(data, name):
+    parts = data.decode().split('---', 2)
+    front = yaml.safe_load(parts[1])
+    if (set(front) != {'name', 'description', 'is_background'}
+            or not isinstance(front['description'], str)
+            or front['is_background'] is not True):
+        raise SyncConflict(f'Unsupported engineering role metadata: {name}')
+    return ('# Engineering delegate\n\n'
+            'Read ../CODEX-RUNTIME.md. These are role instructions, not a registered native agent type. '
+            'Stay within the assigned writable scope; verify behavior and return paths, checks, evidence and blockers. '
+            'Do not assume another model, cloud machine or credentials.\n\n'
+            f"Role: {front['description']}\n\n{parts[2].lstrip()}").encode()
+
+
 def adapt(data, name, adaptations, required=()):
     """Render known upstream instructions for Codex before a three-way merge.
 
@@ -82,16 +104,30 @@ def adapt(data, name, adaptations, required=()):
     translation input must be reviewed rather than silently replacing new policy.
     The live fork is never used to manufacture this merge base.
     """
-    if SKILL_PATH.fullmatch(name):
-        data = normalize_skill(data, name)
     entry = adaptations.get(name, {})
-    if entry.get('normalize_agent_name'):
-        data = normalize_agent_name(data, name)
+    data = canonical_source(data, name, entry)
+    historical = any(legacy['upstream'].encode() == data
+                     for legacy in entry.get('legacy_renderings', []))
     digest = hashlib.sha256(data).hexdigest()
-    if 'reviewed_files' in entry:
-        if digest not in entry['reviewed_files']:
-            raise SyncConflict(f'Unreviewed change to a Codex rewrite: {name}')
-        return entry['reviewed_files'][digest].encode(), set()
+    if 'forks' in entry:
+        # A declared policy fork is an immutable upstream/port pair, not a
+        # whitelist of future file hashes. Preserve compatible upstream deltas.
+        exact = [fork['codex'].encode() for fork in entry['forks']
+                 if fork['upstream'].encode() == data]
+        candidates = set(exact)
+        if not exact:
+            for fork in entry['forks']:
+                try:
+                    candidates.add(merge(fork['codex'].encode(), fork['upstream'].encode(), data, name))
+                except SyncConflict:
+                    continue
+        if len(candidates) != 1:
+            raise SyncConflict(f'Conflicting or ambiguous declared Codex fork: {name}')
+        return candidates.pop(), set()
+    if entry.get('role') == 'engineering':
+        data = derive_role(data, name)
+    for replacement in entry.get('substitutions', []):
+        data = data.replace(replacement['upstream'].encode(), replacement['codex'].encode())
     active = set()
     # Match all inputs against the same source, so one translation cannot trigger
     # another translation or accidentally consume its output.
@@ -108,7 +144,7 @@ def adapt(data, name, adaptations, required=()):
             start = data.index(source)
             replacements.append((start, start + len(source), matches[0]['codex'].encode()))
             active.add(index)
-        elif index in required and digest not in rule.get('reviewed_absence', []):
+        elif (index in required or (rule.get('required') and not historical)) and digest not in rule.get('reviewed_absence', []):
             raise SyncConflict(f'Upstream changed Codex translation {index + 1}: {name}')
     end = 0
     rendered = []
@@ -133,8 +169,13 @@ def normalize_agent_name(data, name):
         raise SyncConflict(f'Invalid agent frontmatter: {name}')
     try:
         front = yaml.safe_load(parts[1])
+        node = yaml.compose(parts[1])
     except yaml.YAMLError as error:
         raise SyncConflict(f'Invalid agent frontmatter: {name}') from error
+    if isinstance(node, yaml.MappingNode):
+        keys = [key.value for key, _ in node.value]
+        if len(keys) != len(set(keys)):
+            raise SyncConflict(f'Duplicate agent metadata: {name}')
     names = list(re.finditer(r'^name: ([^\r\n]+)$', parts[1], re.M))
     if (not isinstance(front, dict) or not isinstance(front.get('name'), str)
             or len(names) != 1):
@@ -215,7 +256,14 @@ def sync(root, upstream, ref, validator=validate):
         after = new[name][0] if name in new else None
         required = set()
         if before is not None:
+            source_before = canonical_source(before, name, adaptations.get(name, {}))
             before, required = adapt(before, name, adaptations)
+            # One-time migration of historical compact rewrites to granular
+            # derivation. Three-way merge retains real local edits, or blocks.
+            for legacy in adaptations.get(name, {}).get('legacy_renderings', []):
+                if source_before == legacy['upstream'].encode() and current is not None:
+                    current = merge(current, legacy['codex'].encode(), before, name)
+                    break
         if after is not None:
             after, _ = adapt(after, name, adaptations, required)
         if after is None:

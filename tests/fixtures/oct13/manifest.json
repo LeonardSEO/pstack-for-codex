@@ -1,0 +1,35 @@
+{
+  "base": "1b6d44ff26d4e242f4e8f68c391e6d2f7ca16def",
+  "head": "1dcc2bacde73ddd284803b7af28164d0436198fc",
+  "fork_base": "cce049025b7ce971af50c5e9ed010aaf750f7e0d",
+  "files": {
+    "agents/poteto-agent.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "5cbeb2c1fea67b28ea9ef95c3416dca3c3f8be278b9654acbf2ea87c7877440a"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "cb41fdb80b3eaab7604547c378b97e339689dfebb77e24d4b10c07bbf65590ab"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "a7a09cae78a5b878b75df28f10d2256fd1f11b216138633156124f9e4dab6288"
+      }
+    },
+    "skills/poteto-mode/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "c5900f379a4582cd2980b45b82c419baffc11929a37e7bb463d77dd0569d37a5"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "f6d1edf26119cb9251e3db499c79c689599fdf706c268b61051d05c8b953b43a"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "a21fd4b12d1e74469c2b4ee45aa5ed8fc7e1cfc2572b2522d47f2f4e9374ae96"
+      }
+    }
+  }
+}

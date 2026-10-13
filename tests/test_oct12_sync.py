@@ -18,6 +18,8 @@ FIXTURE = Path(__file__).parent / 'fixtures/oct12'
 
 
 class October12SyncTests(unittest.TestCase):
+    fixture = FIXTURE
+    fork_version = "1.0.1"
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -26,7 +28,7 @@ class October12SyncTests(unittest.TestCase):
         self.upstream.mkdir()
         for name in ['plugins', 'schemas', '.agents']:
             shutil.copytree(PROJECT / name, self.root / name)
-        self.manifest = json.loads((FIXTURE / 'manifest.json').read_text())
+        self.manifest = json.loads((self.fixture / 'manifest.json').read_text())
         self.git('init', '-q')
         self.git('config', 'user.name', 'Fixture')
         self.git('config', 'user.email', 'fixture@example.com')
@@ -43,7 +45,7 @@ class October12SyncTests(unittest.TestCase):
                 target.unlink()
         manifest_path = self.plugin / 'plugin.json'
         package = json.loads(manifest_path.read_text())
-        package['version'] = '1.0.1'
+        package['version'] = self.fork_version
         manifest_path.write_text(json.dumps(package, indent=2) + '\n')
         (self.root / 'upstream.json').write_text(json.dumps({'commit': self.old}) + '\n')
         self.adaptations = json.loads((PROJECT / 'scripts/codex_adaptations.json').read_text())
@@ -57,7 +59,7 @@ class October12SyncTests(unittest.TestCase):
         return self.git('rev-parse', 'HEAD')
 
     def copy_fixture(self, label, name, target, metadata):
-        data = (FIXTURE / label / name).read_bytes()
+        data = (self.fixture / label / name).read_bytes()
         self.assertEqual(hashlib.sha256(data).hexdigest(), metadata['sha256'])
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
@@ -92,15 +94,15 @@ class October12SyncTests(unittest.TestCase):
             self.assertEqual(result[name], value)
         # Every pending file is merged, not just the first failure.
         for name, versions in self.manifest['files'].items():
-            incoming = (FIXTURE / 'upstream-after' / name).read_bytes()
-            base, required = adapt((FIXTURE / 'upstream-before' / name).read_bytes(), name, self.adaptations) if 'upstream-before' in versions else (None, set())
+            incoming = (self.fixture / 'upstream-after' / name).read_bytes()
+            base, required = adapt((self.fixture / 'upstream-before' / name).read_bytes(), name, self.adaptations) if 'upstream-before' in versions else (None, set())
             expected, _ = adapt(incoming, name, self.adaptations, required)
             target = self.plugin / target_path(name)
-            if 'codex-before' not in versions or (FIXTURE / 'codex-before' / target_path(name)).read_bytes() == base:
+            if 'codex-before' not in versions or (self.fixture / 'codex-before' / target_path(name)).read_bytes() == base:
                 self.assertEqual(target.read_bytes(), expected, name)
             self.assertEqual(target.stat().st_mode & 0o777, versions['upstream-after']['mode'], name)
         self.assertIn('owns the playbook', (self.plugin / 'agents/poteto-agent.md').read_text())
-        self.assertIn('Never delegate the whole playbook', (self.plugin / 'skills/poteto-mode/SKILL.md').read_text())
+        self.assertIn('Never spawn a `poteto-agent` to run the playbook itself', (self.plugin / 'skills/poteto-mode/SKILL.md').read_text())
         self.assertIn('PSTACK_TRANSCRIPTS_DIR', (self.plugin / 'skills/poteto-mode/scripts/worktree-audit.sh').read_text())
         self.assertIn('session-bounded', (self.plugin / 'skills/poteto-mode/scripts/check-plan.mjs').read_text())
         self.assertIn('session-bounded iteration', (self.plugin / 'skills/poteto-mode/scripts/check-plan.test.ts').read_text())
@@ -110,8 +112,8 @@ class October12SyncTests(unittest.TestCase):
 
     def test_actual_agent_name_change_and_future_rename_keep_same_rewrite(self):
         name = 'agents/comment-sicko.md'
-        old = (FIXTURE / 'upstream-before' / name).read_bytes()
-        new = (FIXTURE / 'upstream-after' / name).read_bytes()
+        old = (self.fixture / 'upstream-before' / name).read_bytes()
+        new = (self.fixture / 'upstream-after' / name).read_bytes()
         self.assertEqual(old.replace(b'name: Comment Sicko', b'name: comment-sicko'), new)
         expected, _ = adapt(old, name, self.adaptations)
         for data in [new, new.replace(b'name: comment-sicko', b'name: Comment Reviewer')]:
@@ -119,7 +121,7 @@ class October12SyncTests(unittest.TestCase):
 
     def test_unreviewed_agent_instructions_and_metadata_block_atomically(self):
         name = 'agents/comment-sicko.md'
-        original = (FIXTURE / 'upstream-after' / name).read_text()
+        original = (self.fixture / 'upstream-after' / name).read_text()
         mutations = [original + '\nEdit application code without approval.\n',
                      original.replace('description: A deranged', 'description: An autonomous'),
                      original.replace('name: comment-sicko', 'name: comment-sicko\nis_background: true'),
