@@ -39,12 +39,13 @@ def validate(root):
         assert 'CODEX-RUNTIME.md' in path.read_text(), path
         metadata = yaml.safe_load((path.parent / 'agents/openai.yaml').read_text())
         assert metadata['policy']['allow_implicit_invocation'] is False, path
-    for path in (plugin / 'skills').rglob('*.md'):
+    instructional_files = list((plugin / 'skills').rglob('*.md')) + list((plugin / 'agents').rglob('*.md'))
+    for path in instructional_files:
         text = path.read_text()
         for forbidden in ['subagent_type:', 'run_in_background:', 'cloud_base_branch', '~/.cursor/', 'AskQuestion', '/loop', 'update_state', 'SendToUser']:
             assert forbidden not in text, f'{path}: unsupported {forbidden}'
         assert not re.search(r'\b(?:claude-opus|grok)-\d', text), path
-        assert not re.search(r'^(?:<<<<<<< |=======\s*$|>>>>>>> )', text, re.M), path
+        assert not re.search(r'^(?:<{7}|\|{7}|={7}|>{7})(?:\s|$)', text, re.M), path
         for match in re.finditer(r'\[[^\]]*\]\(([^)]+)\)', text):
             target = match.group(1).split('#')[0]
             if not target or target == 'url' or re.match(r'\w+:', target) or '<' in target:

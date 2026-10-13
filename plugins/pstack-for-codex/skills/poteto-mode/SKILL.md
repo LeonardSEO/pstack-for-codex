@@ -10,6 +10,8 @@ Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workf
 
 # Poteto mode
 
+Bundled skills live at `../<name>/SKILL.md` from this file, so put this file's absolute path in every engineering delegate prompt.
+
 ## Startup
 
 Read .agents/pstack-config.md from the current project when present. This is explicit loading, not a host rule. Default all roles to inherit-parent. Resolve sibling skills, playbooks and scripts relative to this plugin.
@@ -88,9 +90,13 @@ Continue authorized work within scope. The user's request and host policies gove
 
 ## Subagents
 
-Read CODEX-RUNTIME.md. The chat that receives poteto-mode runs the playbook, owns the todo list and spawns its delegates. Never delegate the whole playbook to an engineering delegate. Use available native delegation only when permitted. Engineering delegates read agents/poteto-agent.md and this skill; routed roles read their own reference prompts. Give each writer an isolated worktree or disjoint writable scope. Default to inherited model and reasoning effort. No hardcoded model families, cloud environments, named agent types or unsupported task flags.
+**Use available native delegation for engineering and helper tasks, with the bundled engineering role prompt.** The chat that receives `/poteto-mode` runs the playbook. Never spawn a `poteto-agent` to run the playbook itself. Engineering delegates read agents/poteto-agent.md and this skill. Routed workflow skills (`how`, `why`, `interrogate`, `reflect`, `swarm`) use their own bundled reference prompts. Respect each role and the Codex runtime contract.
 
-When tools do not permit delegation, execute the same phases sequentially and label self-review honestly. A required independent shipping verdict remains blocked until an independent reviewer is available. Own and verify every delegated result. Fresh roles receive consolidated briefs; reuse a running agent only when it holds state that is costly to reconstruct.
+Read CODEX-RUNTIME.md. Give each writer an isolated worktree or disjoint writable scope. Default to inherited model and reasoning effort. Use actual exposed native tools; do not assume hardcoded models, cloud environments, named agent types or unsupported task flags. When tools do not permit delegation, execute the same phases sequentially and label self-review honestly. A required independent shipping verdict remains blocked until an independent reviewer is available.
+
+Own and verify every delegated result. Review the diff and write your own summary. Independent runs of one model do not constitute model diversity.
+
+**Fresh subagents by default.** Give new work to a fresh subagent with consolidated scope, meaning the original brief, every later directive, and the prior agent's report and branch. This holds for a fix round, a follow-up, a retry, and the next queue item. Resume, message, or queue a follow-up on an existing subagent only when the new work strictly needs state that lives in that agent and is costly to move: its local checkout, its uncommitted changes, or a process it still runs, such as a dev server, a simulator, or a babysit watcher. A stop or hold order to a running agent is not reuse. A role such as a PR owner outlives its agent. Once that agent returns, a fresh agent takes the role's next round. Interrupt-chained resumes silently drop directives, so fire a fresh subagent with consolidated scope rather than trusting a "done" summary.
 
 ## Writing the reply
 
