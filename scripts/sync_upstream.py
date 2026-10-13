@@ -238,13 +238,21 @@ def sync(root, upstream, ref, validator=validate):
     state_path = root / 'upstream.json'
     state = json.loads(state_path.read_text())
     head = git(upstream, 'rev-parse', f'{ref}^{{commit}}').decode().strip()
+    try:
+        version = json.loads(git(upstream, 'show', f'{head}:pstack/.cursor-plugin/plugin.json'))['version']
+        if not isinstance(version, str) or not re.fullmatch(r'\d+\.\d+\.\d+', version):
+            raise ValueError('Expected a major.minor.patch version')
+    except (subprocess.CalledProcessError, ValueError, KeyError, TypeError) as error:
+        raise SyncConflict('Missing or invalid upstream pstack version') from error
+    plugin = root / 'plugins/pstack-for-codex'
+    manifest_path = plugin / 'plugin.json'
+    manifest = json.loads(manifest_path.read_text())
     old = snapshot(upstream, state['commit'])
     new = snapshot(upstream, head)
-    if old == new:
+    if old == new and manifest['version'] == version:
         if validator is not None:
             validate_candidate(root, validator)
         return False
-    plugin = root / 'plugins/pstack-for-codex'
     adaptations = json.loads(ADAPTATIONS_PATH.read_text())
     changes = {}
     for name in sorted(old.keys() | new.keys()):
@@ -286,10 +294,7 @@ def sync(root, upstream, ref, validator=validate):
                 skill_name = target.parent.name
                 changes[meta] = (yaml.safe_dump({'interface': {'display_name': skill_name.replace('-', ' ').title(), 'short_description': 'Engineering workflow for Codex', 'default_prompt': f'Use ${skill_name} for this task.'}, 'policy': {'allow_implicit_invocation': False}}, sort_keys=False).encode(), 0o644)
         changes[target] = (content, new[name][1])
-    manifest_path = plugin / 'plugin.json'
-    manifest = json.loads(manifest_path.read_text())
-    major, minor, patch = map(int, manifest['version'].split('.'))
-    manifest['version'] = f'{major}.{minor}.{patch + 1}'
+    manifest['version'] = version
     state['commit'] = head
     changes[manifest_path] = ((json.dumps(manifest, indent=2) + '\n').encode(), 0o644)
     changes[state_path] = ((json.dumps(state, indent=2) + '\n').encode(), 0o644)

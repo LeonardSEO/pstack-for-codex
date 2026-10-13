@@ -29,6 +29,14 @@ class October12SyncTests(unittest.TestCase):
         for name in ['plugins', 'schemas', '.agents']:
             shutil.copytree(PROJECT / name, self.root / name)
         self.manifest = json.loads((self.fixture / 'manifest.json').read_text())
+        expected_skills = {str(p.relative_to(PROJECT / 'plugins/pstack-for-codex'))
+                           for p in (PROJECT / 'plugins/pstack-for-codex/skills').glob('*/SKILL.md')}
+        for name, versions in self.manifest['files'].items():
+            if name.startswith('skills/') and name.endswith('/SKILL.md'):
+                expected_skills.discard(name)
+                if 'upstream-after' in versions:
+                    expected_skills.add(name)
+        self.expected_skill_count = len(expected_skills)
         self.git('init', '-q')
         self.git('config', 'user.name', 'Fixture')
         self.git('config', 'user.email', 'fixture@example.com')
@@ -66,6 +74,9 @@ class October12SyncTests(unittest.TestCase):
         os.chmod(target, metadata['mode'])
 
     def install_upstream(self, label):
+        package = self.upstream / 'pstack/.cursor-plugin/plugin.json'
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(json.dumps({'version': self.manifest['upstream_versions'][label]}))
         for name, versions in self.manifest['files'].items():
             target = self.upstream / 'pstack' / name
             if label in versions:
@@ -84,7 +95,7 @@ class October12SyncTests(unittest.TestCase):
         validated = []
         def check(candidate):
             self.assertEqual(self.files(), before)
-            self.assertEqual(validate(candidate), 53)
+            self.assertEqual(validate(candidate), self.expected_skill_count)
             self.assertEqual(json.loads((candidate / 'upstream.json').read_text())['commit'], self.new)
             validated.append(True)
         self.assertTrue(sync(self.root, self.upstream, self.new, validator=check))
@@ -106,7 +117,7 @@ class October12SyncTests(unittest.TestCase):
         self.assertIn('PSTACK_TRANSCRIPTS_DIR', (self.plugin / 'skills/poteto-mode/scripts/worktree-audit.sh').read_text())
         self.assertIn('session-bounded', (self.plugin / 'skills/poteto-mode/scripts/check-plan.mjs').read_text())
         self.assertIn('session-bounded iteration', (self.plugin / 'skills/poteto-mode/scripts/check-plan.test.ts').read_text())
-        self.assertEqual(json.loads((self.plugin / 'plugin.json').read_text())['version'], '1.0.2')
+        self.assertEqual(json.loads((self.plugin / 'plugin.json').read_text())['version'], '0.15.20')
         self.assertFalse(sync(self.root, self.upstream, self.new))
         self.assertEqual(self.files(), result)
 

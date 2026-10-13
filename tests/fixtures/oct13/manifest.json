@@ -31,5 +31,9 @@
         "sha256": "a21fd4b12d1e74469c2b4ee45aa5ed8fc7e1cfc2572b2522d47f2f4e9374ae96"
       }
     }
+  },
+  "upstream_versions": {
+    "upstream-before": "0.15.20",
+    "upstream-after": "0.15.21"
   }
 }

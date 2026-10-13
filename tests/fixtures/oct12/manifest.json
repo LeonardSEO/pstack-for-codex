@@ -387,5 +387,9 @@
         "sha256": "58fee61d024b3700b407e7acbed367944720ff05adfddb6954d36c88368f3ba7"
       }
     }
+  },
+  "upstream_versions": {
+    "upstream-before": "0.15.17",
+    "upstream-after": "0.15.20"
   }
 }

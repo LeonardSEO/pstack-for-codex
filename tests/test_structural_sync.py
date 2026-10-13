@@ -28,7 +28,7 @@ class StructuralSyncTests(unittest.TestCase):
         calls = []
         def check(staged):
             self.assertEqual(self.files(), before)
-            self.assertEqual(validate(staged), 53)
+            self.assertEqual(validate(staged), self.expected_skill_count)
             calls.append(True)
         self.assertTrue(sync(self.root, self.upstream, self.new, validator=check))
         self.assertEqual(calls, [True])
@@ -42,7 +42,7 @@ class StructuralSyncTests(unittest.TestCase):
         for key, value in protected.items():
             self.assertEqual(after[key], value)
         self.assertEqual(json.loads((self.root / 'upstream.json').read_text())['commit'], self.new)
-        self.assertEqual(json.loads((self.plugin / 'plugin.json').read_text())['version'], '1.0.3')
+        self.assertEqual(json.loads((self.plugin / 'plugin.json').read_text())['version'], '0.15.21')
         self.assertFalse(sync(self.root, self.upstream, self.new))
         self.assertEqual(self.files(), after)
 

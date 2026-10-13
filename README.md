@@ -107,7 +107,7 @@ Read the [runtime contract](plugins/pstack-for-codex/CODEX-RUNTIME.md) for execu
 
 ### Follow validated updates on main
 
-A [GitHub Action](.github/workflows/sync-upstream.yml) checks pstack upstream daily at **04:17 UTC** and supports manual runs. It merges compatible upstream changes with the Codex adaptations, runs validation, increments the plugin patch version, and commits to `main`. It then publishes a matching GitHub release: version `1.0.2` becomes tag `v1.0.2`, with release notes, a ZIP snapshot, and a SHA-256 checksum. Conflicts, unsupported instructions, or validation failures stop publication. The synchronizer requires no AI API key and does not execute upstream helper code.
+A [GitHub Action](.github/workflows/sync-upstream.yml) checks pstack upstream daily at **04:17 UTC** and supports manual runs. It merges compatible upstream changes with the Codex adaptations, runs validation, copies the version from the upstream pstack manifest, and commits to `main`. It then publishes a matching GitHub release: upstream version `0.15.23` becomes plugin version `0.15.23` and tag `v0.15.23`, with release notes, a ZIP snapshot, and a SHA-256 checksum. Conflicts, unsupported instructions, or validation failures stop publication. The synchronizer requires no AI API key and does not execute upstream helper code.
 
 Refresh your installation:
 
@@ -120,9 +120,9 @@ Start a new session after updating. GitHub may delay scheduled runs and disables
 
 ### Use a versioned snapshot
 
-[Releases](https://github.com/LeonardSEO/pstack-for-codex/releases) provide tagged snapshots and release notes. For a fresh installation pinned to this release, replace `--ref main` in the installation command with `--ref v1.0.1`. A pinned marketplace stays on that ref until you change it.
+[Releases](https://github.com/LeonardSEO/pstack-for-codex/releases) provide tagged snapshots and release notes. For a fresh installation pinned to this release, replace `--ref main` in the installation command with `--ref v0.15.23`. A pinned marketplace stays on that ref until you change it.
 
-Each automated release includes a ZIP archive and a SHA-256 checksum. The marketplace commands above are the recommended installation route. Runs without upstream changes do not increase the version. After validation, the workflow ensures the current version has a release, skips an already published release, and can finish a draft left by an interrupted upload. Assets are uploaded before the release becomes public.
+Each automated release includes a ZIP archive and a SHA-256 checksum. The marketplace commands above are the recommended installation route. Codex adaptations do not receive a separate version number. A version-only upstream change also updates the plugin; changes within the same upstream version keep that version. Existing published releases remain immutable; follow `main` for later Codex fixes within the same version. After validation, the workflow ensures the current version has a release, skips an already published release, and can finish a draft left by an interrupted upload. Assets are uploaded before the release becomes public.
 
 ### The additional review skill stays independent
 
@@ -146,7 +146,7 @@ Translations match protected source fragments exactly, while scoped mechanical s
 
 Read the [sync design and pstack-claude comparison](docs/upstream-sync-design.md) for the derivation, fork ownership and publication tradeoffs. To extend a translation or policy fork, compare both source revisions and the current fork, preserve the intended upstream behavior under the Codex runtime contract, and add a regression. Never manufacture an upstream base from the live fork or add a blanket ours/theirs resolution.
 
-The synchronizer validates a staged copy of the complete proposed package before writing files, incrementing the saved version, or advancing the checkpoint. A repeated sync of the same source is a validated no-op. The workflow validates again before committing or releasing. Package checks validate metadata, local skill links, and compatibility rules; they do not prove every workflow or external integration works in your environment.
+The synchronizer validates a staged copy of the complete proposed package before writing files, updating the saved version, or advancing the checkpoint. A repeated sync of the same source is a validated no-op. The workflow validates again before committing or releasing. Package checks validate metadata, local skill links, and compatibility rules; they do not prove every workflow or external integration works in your environment.
 
 ## Credits and license
 

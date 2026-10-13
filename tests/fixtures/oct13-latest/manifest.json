@@ -1,0 +1,101 @@
+{
+  "base": "1dcc2bacde73ddd284803b7af28164d0436198fc",
+  "head": "dbf49813a39c1a5389c5e28cb8e4c1c2379e2454",
+  "fork_base": "fb391e51376feeb4a293a213d40b8f54e19fde17",
+  "files": {
+    "agents/poteto-agent.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "cb41fdb80b3eaab7604547c378b97e339689dfebb77e24d4b10c07bbf65590ab"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "979f18abd000d185a0b4c41a2a4111c0910596a7f5c81cbb571885bc721b2bf7"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "038c04c4d1fb8e9ed72ab8c5f884edf4bb78dac278147467dd5fdea36d4233d6"
+      }
+    },
+    "skills/in-your-own-words/SKILL.md": {
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "fa8ba74e27d7be371dc270ec78bbf816411477d0dfab185356c861ac8dd413ad"
+      }
+    },
+    "skills/ketchup/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "3b00c552fdb236ecfce85184000814bf62d7c518aac3acd1ba7ea8e02d8f2196"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "13b3a4e5dbce25a07f6bda558bbac7e5194012c51d80af4ef83415ba26eaadc6"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "988d2dc066cd78bbb10949d64a94b481aa13dad7a4ce94c48541d6763eaf0771"
+      }
+    },
+    "skills/poteto-help/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "3fe669c7c3b8f52c18b7c68ecce01c8691e844b9d2b41a8a6ff6432341451986"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "79950407d71018d0e23e018cf620a570031fbba36df6584abeaacdfac318afe5"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "2317600a19e0f9a2d0f1d25686a3ef859eb550a34db1e38ed93c5b54057919fe"
+      }
+    },
+    "skills/poteto-help/references/recipes.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "1872323419a3e5c7783b1933f7a180ca26c25a6e1f4ec83bd65e091ebbfb812b"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "315b211b6cc6b19e3da7c4a1e8ddde2d8557588713d0b894509bd22821c709da"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "396a61f15f1d7e0ad69f16d57e46e42be8f9c2eb56bd5df0d90c6d67b4606f04"
+      }
+    },
+    "skills/poteto-mode/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "f6d1edf26119cb9251e3db499c79c689599fdf706c268b61051d05c8b953b43a"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "be90e646b623c5d2494d57ec14b8079d47904a1ca9456c10a2100c1dd90f9982"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "2a05e00662094e4896da4f71ef0485a9c29a5fccede4bb638fc270f08b842fa8"
+      }
+    },
+    "skills/principle-fix-root-causes/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "ba4cd38da1dcc8fe5432feb64457cba95594736a9b21b2ebf8f8c52aee068707"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "2131069d285d82fb799458494f2e4ac8759c9c6a60f9e300828c17874f514c6e"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "77fe67cf11bfaced91eef147f276656f5bc19d0f6324e6fe92d8fcb42dd670c4"
+      }
+    }
+  },
+  "upstream_versions": {
+    "upstream-before": "0.15.21",
+    "upstream-after": "0.15.23"
+  }
+}

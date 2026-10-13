@@ -18,7 +18,7 @@ class ReleaseTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         plugin = self.root / 'plugins/pstack-for-codex'
         plugin.mkdir(parents=True)
-        (plugin / 'plugin.json').write_text(json.dumps({'version': '1.0.2'}))
+        (plugin / 'plugin.json').write_text(json.dumps({'version': '0.15.23'}))
         (self.root / 'upstream.json').write_text(json.dumps({'commit': 'a' * 40}))
         (self.root / 'README.md').write_text('release snapshot')
         self.git('init', '-q')
@@ -48,7 +48,7 @@ elif args[:2] == ['release', 'upload']:
     assert checksum.read_text() == hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\\n'
     with zipfile.ZipFile(archive) as package:
         assert package.testzip() is None
-        assert package.read('pstack-for-codex-1.0.2/README.md') == b'release snapshot'
+        assert package.read('pstack-for-codex-0.15.23/README.md') == b'release snapshot'
     if os.environ.get('GH_TEST_FAIL_UPLOAD'):
         sys.exit(1)
 ''')
@@ -71,7 +71,7 @@ elif args[:2] == ['release', 'upload']:
         result, calls = self.run_release()
         self.assertEqual(result.returncode, 0, result.stderr)
         create = next(call for call in calls if call[:2] == ['release', 'create'])
-        self.assertEqual(create[2], 'v1.0.2')
+        self.assertEqual(create[2], 'v0.15.23')
         self.assertEqual(create[create.index('--target') + 1], self.commit)
         self.assertIn('--draft', create)
         self.assertEqual([call[1] for call in calls], ['view', 'create', 'upload', 'edit'])

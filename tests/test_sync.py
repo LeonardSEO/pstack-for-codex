@@ -23,10 +23,11 @@ class SyncTests(unittest.TestCase):
         self.git('config', 'user.email', 'fixture@example.com')
         self.git('config', 'user.name', 'Fixture')
         self.file('skills/example/reference.md', 'first\nsecond\nthird\n')
+        self.file('.cursor-plugin/plugin.json', json.dumps({'version': '0.15.23'}))
         self.old = self.commit()
         (self.plugin / 'skills/example').mkdir(parents=True)
         (self.plugin / 'skills/example/reference.md').write_text('Codex first\nsecond\nthird\n')
-        (self.plugin / 'plugin.json').write_text(json.dumps({'name':'pstack-for-codex','version':'1.0.0'}))
+        (self.plugin / 'plugin.json').write_text(json.dumps({'name':'pstack-for-codex','version':'0.15.23'}))
         (self.repo / 'upstream.json').write_text(json.dumps({'commit':self.old}))
 
     def git(self, *args):
@@ -51,6 +52,44 @@ class SyncTests(unittest.TestCase):
     def repo_files(self):
         return {str(p.relative_to(self.repo)): p.read_bytes()
                 for p in self.repo.rglob('*') if p.is_file()}
+
+    def test_version_only_upstream_change_updates_version_and_checkpoint(self):
+        self.file('.cursor-plugin/plugin.json', json.dumps({'version': '0.16.0'}))
+        head = self.commit()
+        content = (self.plugin / 'skills/example/reference.md').read_bytes()
+        self.assertTrue(self.run_sync(head))
+        self.assertEqual(json.loads((self.plugin / 'plugin.json').read_text())['version'], '0.16.0')
+        self.assertEqual(json.loads((self.repo / 'upstream.json').read_text())['commit'], head)
+        self.assertEqual((self.plugin / 'skills/example/reference.md').read_bytes(), content)
+        saved = self.repo_files()
+        self.assertFalse(self.run_sync(head))
+        self.assertEqual(self.repo_files(), saved)
+
+    def test_legacy_fork_version_is_aligned_even_at_the_same_checkpoint(self):
+        path = self.plugin / 'plugin.json'
+        manifest = json.loads(path.read_text())
+        manifest['version'] = '1.0.5'
+        path.write_text(json.dumps(manifest))
+        self.assertTrue(self.run_sync(self.old))
+        self.assertEqual(json.loads(path.read_text())['version'], '0.15.23')
+        self.assertFalse(self.run_sync(self.old))
+
+    def test_invalid_or_missing_upstream_version_blocks_without_writes(self):
+        from sync_upstream import SyncConflict
+        for data in ['{}', '[]', '{"version": "../../bad"}', '{"version": 23}', 'not json']:
+            with self.subTest(data=data):
+                self.file('.cursor-plugin/plugin.json', data)
+                head = self.commit()
+                before = self.repo_files()
+                with self.assertRaisesRegex(SyncConflict, 'upstream pstack version'):
+                    self.run_sync(head)
+                self.assertEqual(self.repo_files(), before)
+        (self.upstream / 'pstack/.cursor-plugin/plugin.json').unlink()
+        head = self.commit()
+        before = self.repo_files()
+        with self.assertRaisesRegex(SyncConflict, 'upstream pstack version'):
+            self.run_sync(head)
+        self.assertEqual(self.repo_files(), before)
 
     def arena_fixture(self, name):
         return (Path(__file__).parent / 'fixtures/arena' / (name + '.md')).read_text()
@@ -200,7 +239,7 @@ class SyncTests(unittest.TestCase):
         def accept(staged):
             self.assertEqual(self.repo_files(), before)
             self.assertEqual(json.loads((staged / 'upstream.json').read_text())['commit'], new)
-            self.assertEqual(json.loads((staged / 'plugins/pstack-for-codex/plugin.json').read_text())['version'], '1.0.1')
+            self.assertEqual(json.loads((staged / 'plugins/pstack-for-codex/plugin.json').read_text())['version'], '0.15.23')
             validated.append(staged)
         from sync_upstream import sync
         self.assertTrue(sync(self.repo, self.upstream, new, validator=accept))
@@ -268,7 +307,7 @@ class SyncTests(unittest.TestCase):
         self.assertTrue(self.run_sync(new))
         self.assertEqual((self.plugin/'skills/example/reference.md').read_text(), 'Codex first\nsecond\nupstream third\n')
         self.assertEqual(json.loads((self.repo/'upstream.json').read_text())['commit'],new)
-        self.assertEqual(json.loads((self.plugin/'plugin.json').read_text())['version'],'1.0.1')
+        self.assertEqual(json.loads((self.plugin/'plugin.json').read_text())['version'],'0.15.23')
         self.assertFalse(self.run_sync(new))
 
     def test_conflict_does_not_change_files_or_checkpoint(self):
@@ -298,7 +337,7 @@ class SyncTests(unittest.TestCase):
     def test_upstream_outside_pstack_has_no_effect(self):
         (self.upstream/'elsewhere.md').write_text('other plugin')
         self.assertFalse(self.run_sync(self.commit()))
-        self.assertEqual(json.loads((self.plugin/'plugin.json').read_text())['version'],'1.0.0')
+        self.assertEqual(json.loads((self.plugin/'plugin.json').read_text())['version'],'0.15.23')
 
     def test_new_symlink_is_rejected(self):
         (self.upstream/'pstack/skills/escape').symlink_to('/etc/passwd')

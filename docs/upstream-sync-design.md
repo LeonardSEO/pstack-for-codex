@@ -73,3 +73,30 @@ source `1dcc2bacde73ddd284803b7af28164d0436198fc` from checkpoint
 within the role and parent paragraph, preserve local notes and Codex policy,
 reject incompatible role instructions and unknown host flags, prove conflict and
 validation-failure atomicity, and repeat synchronization without changes.
+
+The later October 13 update exposed another complete-file fork: poteto-help had
+replaced the upstream skill table with a compact summary. Adding a skill or
+changing a table description therefore collided with the rewrite. The help page
+now preserves upstream routing content and translates only host-specific
+instructions. Its old fork pairs are migration inputs, not future merge anchors.
+Delegate discovery resolves the skill in the same installed plugin, or asks the
+parent for its absolute path, instead of searching Cursor installations.
+
+The `oct13-latest` fixture replays all seven managed paths from `1dcc2bac` to
+`dbf49813` (upstream pstack 0.15.23), including the new in-your-own-words skill
+and ketchup changes. It also tests later help-table edits without new registry
+entries, local-note preservation, protected-instruction conflicts, and an
+unchanged second sync. Historical fixtures derive their expected skill count
+from the package plus the fixture's additions/deletions so new bundled skills
+do not invalidate unrelated regression checks.
+
+## Version and runner policy
+
+The plugin takes its version from `pstack/.cursor-plugin/plugin.json` at the exact
+upstream commit being synchronized. There is no separate Codex patch counter.
+Version-only changes and the migration from a former 1.0.x version are validated
+and applied through the same staging path. Missing or invalid source versions
+block all writes. Existing published tags are not moved or overwritten.
+
+Both GitHub Actions workflows use `ubuntu-24.04`, avoiding automatic migration
+of `ubuntu-latest` to Ubuntu 26. Runner upgrades are explicit repository changes.
