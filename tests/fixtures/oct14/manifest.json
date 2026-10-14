@@ -1,0 +1,549 @@
+{
+  "base": "dbf49813a39c1a5389c5e28cb8e4c1c2379e2454",
+  "head": "1e5c90a4b6f249917bd21fe361b3a2a7deb741b8",
+  "fork_base": "512fb30d5eecebaeef65bfa66cafc5e2eae32fc9",
+  "files": {
+    "skills/arena/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "f15524f216c1c63804b89edb4ff8e53bb21a7b8ed367368dedeb9468eeec6a92"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "ed72f6c132b1ce3974d949581d0adc5dade424fe20793ac3b4c4fae22ecb9354"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "04950b8a3d3e38705828cc4ef88091f274f6d453b2e30bf3381865df80d7b655"
+      }
+    },
+    "skills/automate-me/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "1510979b0b71b54284427a19c09918f8b1fdfc168f9b7f9e30098793a5ec88ef"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "30b35f3628c4fd8c11af0ada06d14cdc3b28901810caca2480f627d4d21acfbe"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "120875e1740ed589af52da481498e9fa968dd38f1e698154d6d9e00c35919258"
+      }
+    },
+    "skills/figure-it-out/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "d9574cc24929773d5c23f40626ae1e09660afddd7de48e08dd6494d9fff9bbf0"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "bdb23cdbd82a1e6af094b495691c832a6f7f3ab9706ba9edbeb664ef51a726e1"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "076bbf636309e7483341b6983f7d42db1e5ca7a27eae8451ef3f1e4d545dceac"
+      }
+    },
+    "skills/how/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "47cfe3e6fe55c49c3bdf8ad1b645dcd5fece8f0c36fd22d2e7221f9faa71f648"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "08a00079bb15b4258874ac3ff62d4ca7e94350ffedb521d0fd296dc9dd21904e"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "84939b66b90456ffe74c3eda2951f19df5b31dd2f9b2c47427862641cd32cf5f"
+      }
+    },
+    "skills/interrogate/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "25341c393f515c1e1fa9bce668b7551e9f98c195113a460ff524d3c1f7f50cd9"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "a16dfe179005abc22a4651b82f25b0c8ab953284276efe4e6dc341958fb63647"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "f51dd0625bc3ba5657a645b632b57dfd2773850d1e213735321cbd56dd6ed164"
+      }
+    },
+    "skills/ketchup/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "13b3a4e5dbce25a07f6bda558bbac7e5194012c51d80af4ef83415ba26eaadc6"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "d9704b154081af306b6583b2752498d454f9d761e9989ff1f037efd414f86bb4"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "4d98f6d53a3ed3ee0455e6ba2b6cf5755db5c12cd38d720c6f68f81452a95fd7"
+      }
+    },
+    "skills/no-comments/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "08b9c769040c104ef7fb1902ebac97047edbb89b58c7e113e53c918287b092e6"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "078ecfe224eafbb017f6476870612838bf6dbe38c0b697e12f0c887d0313f17e"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "4e2e4832b64473b8c8f15f99f62ff0b6c81f626645b181a5a8eea603c166df25"
+      }
+    },
+    "skills/poteto-help/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "79950407d71018d0e23e018cf620a570031fbba36df6584abeaacdfac318afe5"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "1b0645c25200a19e5863583e117bad684b1b79ba8434823ebf4f6bbcc61e8a75"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "4166a4b5b299f955e3303ec2ab266f9f1b9dd3e43e6132598eba045f94f56fd9"
+      }
+    },
+    "skills/poteto-help/references/recipes.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "315b211b6cc6b19e3da7c4a1e8ddde2d8557588713d0b894509bd22821c709da"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "5fb97a805976a82db0aba5cc8943e88d0cb38b17a0d6b8e89a44633677febb1a"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "c410c8484f2a271048fc98a53e57d2e2c091a8f9c7d26a58b237f18b9a3569b8"
+      }
+    },
+    "skills/poteto-mode/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "be90e646b623c5d2494d57ec14b8079d47904a1ca9456c10a2100c1dd90f9982"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "f234661471847cafc4ae9bcb4a9208eb32ed8154ac25b91b2b064ec71bd62167"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "2a05e00662094e4896da4f71ef0485a9c29a5fccede4bb638fc270f08b842fa8"
+      }
+    },
+    "skills/poteto-mode/playbooks/autonomous-run.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "15e54ad3ac92565613980772d8708de6e19cc4690bfd4bb3fb8836522407377b"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "6ac974fd2b09748add56493e89f578a35a6a9289e1026515878d81ef3cf129d1"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "00ad8b4ee28a4f6dd84a7e493c741002e52ad8e87e664eda5ab82b8643fafa36"
+      }
+    },
+    "skills/poteto-mode/playbooks/autopilot-full.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "05ca30a16242c19d0c78ba1e88cca66f858d75252cb154fd740099fe292de802"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "acf4f4a58c11045f9d3e8807d907a877e61ca6432b079f1087d7d30fc931566f"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "57388a1aaa031ab4ae998ac7278ac50b4be77e6e2ece5b8da4a6ee8411fd8ae8"
+      }
+    },
+    "skills/poteto-mode/playbooks/autopilot-stack.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "007c0a3b12011954a224f54773ef4ad7b75918be0a311914c1b51ad4e794c1e5"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "c6bcb18b2ce605e77a2a2225854590a4b9a687911f79331746d91a4fe9a52e60"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "734eab1db63190e11778be114a685a00f59ad53b82d5f0e9e1dada446f9767cf"
+      }
+    },
+    "skills/poteto-mode/playbooks/bug-fix.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "018bbc146ae19145caa6c7e70591fee081b64447dda1c1c4b681c9974d928b13"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "66e26542dad131cfd7df80ac0cdf81ed4d85e7b5e3f0eb65b933888760c4831f"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "3d36bc5fb1ba6e53236aff41ed2578e7e685437eddf984cac1b6e2ebd2212279"
+      }
+    },
+    "skills/poteto-mode/playbooks/eval.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "b862bfa2fae2399abf047a8e80d3e3dddb64003af96fb1cebb625216131e36bb"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "a93d449a908236afa6645179651844094b1547dbab4e484cffcdda630e4b90bf"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "d09e52492336c0bb34e50ed67295d2ce1dda1d699710590c2b26abb403b232af"
+      }
+    },
+    "skills/poteto-mode/playbooks/feature.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "3a62cc4a8cbcf144bb9dd05f05420a15be0d38b784d3b141bb730a5852f50a62"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "af8ce700b99953741cb547e34308fde0cf6b98ce67e1652c800d0deedf53aba1"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "a7b7569f4e394fbb4c6bc2d7088a92bbe9f843fb6070046bf6997a0bbf6f77ff"
+      }
+    },
+    "skills/poteto-mode/playbooks/hillclimb.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "244f289898fe67a458065e90fe8217c916c5acf61cdee8975ade3f9831a12e91"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "942c1565b75ad02a2cb6230dd7c1ebd87e19f59a00319ebac2b6616007bf018f"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "2809ba9582831ce505bd2ae717882125ba5261c01d63aee612d01629cc7508bc"
+      }
+    },
+    "skills/poteto-mode/playbooks/multi-phase-plan.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "27d310e3fc3937a60b8fcbe1318f9d249a7477a722907bf85b3e4eb3dc436b11"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "5f239457bfdec3345c92caa06c59bf0257c662b89353f25a1c02ea942dcd00b1"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "6669570039c5768123bcdda29b795867a75b7f7188b8796bd5022b530e2b2998"
+      }
+    },
+    "skills/poteto-mode/playbooks/opening-a-pr.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "931070f5674e81a191277253d4e02b1c45d091b223f93bf506d3896a428a5967"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "a5aef646de8b651306c2d10974623650e4a013a245aec1c00525bbe0e31bfa76"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "6c754906966759f8543f8a95494f755c93cbaed8852c4ef6488ce01c851cbbff"
+      }
+    },
+    "skills/poteto-mode/playbooks/orchestrate.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "d42b4375f1bd4ce23da0b575a198571a2117df7eea10c3c9fc6d92ae1053f7be"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "08dce6c9e7be1d13bc6944ab9b51665f935c531437f5e088bc53d2a62099ef05"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "22d86ebe34408739ebedbff50eb64c613658b6bfe81bb779725bebef6bfbb202"
+      }
+    },
+    "skills/poteto-mode/playbooks/perf-issue.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "2b88ad0f880e4d4d755ac19fe52414d6631d6baa816d060f53cf0a7429d7e14a"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "c12aa2f82de7651a11676a3d5fea168f539b7f0faaa3a501d279255dd2a469c8"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "ac82cb3043677729d62f4f2110546e893353bab9fc5f729fdf9891945795f8d9"
+      }
+    },
+    "skills/poteto-mode/playbooks/refactoring.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "50f4f7d3d301551f8b8a57c3303c99958c5ca630ae0d0051823b6987c0eb5b96"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "0f5dd38113379ea8cf61e2182eca0a7478eea9a869eb40c2dddab3335aeca197"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "07aa5495b00c1711318557929bba360cad7b77b1e4f56e52d21d51936e3b1f6f"
+      }
+    },
+    "skills/poteto-mode/playbooks/runtime-forensics.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "594f02c40c243a346e1f57b688ecf2ed5e882f21b3d24ed2204d1ac6f1c24a8a"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "3463372b578c28f27c236f2627f09b5c5b1e85e86db7399fb984f3892fb450f5"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "594f02c40c243a346e1f57b688ecf2ed5e882f21b3d24ed2204d1ac6f1c24a8a"
+      }
+    },
+    "skills/poteto-mode/playbooks/session-pickup.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "1604fb463f7c7410d43fa024ca76c1c1824c166a01fd69d61f073d06fdca2a47"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "d194f2a7ef392c1598ef3f0e3b561370ca25c2c7a78308007af4aa46ada8ee12"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "e566e15bc3c099174f7fdc22ae94d9607b23ad2926f8ab40a35af263b911e349"
+      }
+    },
+    "skills/poteto-mode/playbooks/shipping.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "19f3f6803a7bbe9ff04f624b03e3b55f07ac0a05e991aa00d5fe51239b920b2a"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "bf56339bdf7e0223bcff5abf4e8599e3f5b547b3fcc3b4ce9475e6e7dda14a9f"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "68bc55574ed8f2ebd9c47eb70e8ed6ae93336e7aeeb4031a4be6c8a2be84d97f"
+      }
+    },
+    "skills/poteto-mode/playbooks/trace-forensics.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "e8a671fd5511a894f90c933bca75815e7a1d730cb53333075a80b0927e81acfc"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "ef0bbf79856a4ae1a8993d54c1a1da159cb97623941b652c0069cf75a017e0f5"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "e8a671fd5511a894f90c933bca75815e7a1d730cb53333075a80b0927e81acfc"
+      }
+    },
+    "skills/poteto-mode/playbooks/worktree-cleanup.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "ffecceb6d2fa7e07ca5703c968f4b7c5947309ed695d51fc73a55c3da5906480"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "be04ae0afe19d4a4da5bcc4e94455f68dbebd1cda6eb0f456ca0d358ecf76c00"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "fd671b1f6cc50805a4ea4ce3a0fe52dc2b8a59b995a04dc44e36c11a96766a5f"
+      }
+    },
+    "skills/poteto-mode/scripts/orch/orch.test.ts": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "773153ac74de6eb15f58d2682f487f5f30672d7efe3ef1d24a131aa9129d279b"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "5e80b416bdcd68e4067690ce857345852fd2e0db3dcf3e25607999cd55b963d2"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "773153ac74de6eb15f58d2682f487f5f30672d7efe3ef1d24a131aa9129d279b"
+      }
+    },
+    "skills/poteto-mode/scripts/orch/orch.ts": {
+      "upstream-before": {
+        "mode": 493,
+        "sha256": "f091687df627a0b75fabd54af58945a9cd6c7039ef0622012ac9ed60cd8ec434"
+      },
+      "upstream-after": {
+        "mode": 493,
+        "sha256": "47c92c57e8276616d8de94665a126bd832e748036afa8d0ffdbacb7946decb5c"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "f091687df627a0b75fabd54af58945a9cd6c7039ef0622012ac9ed60cd8ec434"
+      }
+    },
+    "skills/poteto-mode/scripts/orch/store.ts": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "0eae7cf69282e827b1227166f2e32cee3560f2f3e65b3f1f2faf6fb83d3b4c5b"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "558cfda533e1ebe7c8d7842604f07e0be7618759cf129b4c2397a8e29516ecea"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "0eae7cf69282e827b1227166f2e32cee3560f2f3e65b3f1f2faf6fb83d3b4c5b"
+      }
+    },
+    "skills/poteto-mode/scripts/watch-pr/github.test.ts": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "035f4a0f1ab5a17ebf94ad1f7c14d1abd948852be30987c0e9d107b5ea5028ab"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "70c9f03d8738228763846f2abdd8c7de7be68dba3035041482386a69cbf5639b"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "035f4a0f1ab5a17ebf94ad1f7c14d1abd948852be30987c0e9d107b5ea5028ab"
+      }
+    },
+    "skills/poteto-mode/scripts/watch-pr/github.ts": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "9ea8de77e019de19929fbe4a86bc88492ffbecd89d6816d9857ed49db904c151"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "a605b8531468dbe4c07b93663c0993a9c11dc7e9179adde970f5c740396451d9"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "9ea8de77e019de19929fbe4a86bc88492ffbecd89d6816d9857ed49db904c151"
+      }
+    },
+    "skills/poteto-mode/scripts/worktree-audit.sh": {
+      "upstream-before": {
+        "mode": 493,
+        "sha256": "9faa9a2534ad64069dec67ac5b5ce1dc23b8fe635ecfd7f6557b1e3ada61fd2f"
+      },
+      "upstream-after": {
+        "mode": 493,
+        "sha256": "e0a94e5e5b1ff60638916e440600e15851f7b79bc1a1d1f602fde05d465e2ec0"
+      },
+      "codex-before": {
+        "mode": 493,
+        "sha256": "b853727ac2cb6d7f23cabf60ab3244ea20bafc3b1907259de4dfea0c27d9444e"
+      }
+    },
+    "skills/recall/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "d265b0e5b6dc5b89c0407f3387d24462c988e1990a37d5359735137908128c5a"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "b0ceb996259c3404532f61e4b010df4e3d80d7ddbed85b3c302895723eb62a89"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "7ddf156c346b13caf4379abf0ccb0f487a1b62fe2d0402dcfd33506b3ff888f8"
+      }
+    },
+    "skills/reflect/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "f5e9200f37e2a4567c0eeb0ba244fde66c1b3f35e3b7a883de2f85b3bda7365a"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "1f5a8c246cdee8251f8667d85bd5d97f6c2801f505843c26ddbd6c621632519b"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "ba4811a0f6be48b43d93a2c3a98fe2e8bb5a24ed1d0fd0ae892860d05fa66834"
+      }
+    },
+    "skills/sharpen/SKILL.md": {
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "6bcd73916696eb9c5b79b6f960983760c34bcc28937c11142dd8d86b5107aa46"
+      }
+    },
+    "skills/show-me-your-work/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "bcff5f7f9fd23f92c12b251f9cd6b947e9485e1055cfacb6fdd9cae0789d7550"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "920a8217cbb62f92a2222fb81fc9eab17ecd554a0277e444a95a927195139bd1"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "fa81559d6913bc06a602703daea3880cc86d9ae26adddad128388ed67c8daf7c"
+      }
+    },
+    "skills/swarm/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "bdcee4168e22428036e93d7cdeec3f391dbc4132f927f6db2540328c22db0273"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "c8fe1b28282e7a051a4041a146a11f076e0fd95252bb010106a58209805303d5"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "bc274c6146b08822a9c120a704c947868c7d26484e149f7eadb51f7ed668adc7"
+      }
+    },
+    "skills/why/SKILL.md": {
+      "upstream-before": {
+        "mode": 420,
+        "sha256": "fa1d1e9dec14b15381c1ccccad74044d6b6ea3b4af56821f59ba2d8e59b07545"
+      },
+      "upstream-after": {
+        "mode": 420,
+        "sha256": "144d42e7712723d763e607bc0a969e5f1cdf83ec7228519d87677cc534571bed"
+      },
+      "codex-before": {
+        "mode": 420,
+        "sha256": "d5ac25bbccd57d7dc60fa589a38eb03f6c42f8c93b4b84591f11fa6a41ad124e"
+      }
+    }
+  },
+  "upstream_versions": {
+    "upstream-before": "0.15.23",
+    "upstream-after": "0.15.24"
+  }
+}

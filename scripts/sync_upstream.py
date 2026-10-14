@@ -1,5 +1,4 @@
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -100,15 +99,12 @@ def derive_role(data, name):
 def adapt(data, name, adaptations, required=()):
     """Render known upstream instructions for Codex before a three-way merge.
 
-    Exact, reviewed source fragments make translations deterministic. An edited
-    translation input must be reviewed rather than silently replacing new policy.
+    Translate recognized host instructions and keep other upstream changes.
+    The complete staged package must pass Codex compatibility validation.
     The live fork is never used to manufacture this merge base.
     """
     entry = adaptations.get(name, {})
     data = canonical_source(data, name, entry)
-    historical = any(legacy['upstream'].encode() == data
-                     for legacy in entry.get('legacy_renderings', []))
-    digest = hashlib.sha256(data).hexdigest()
     if 'forks' in entry:
         # A declared policy fork is an immutable upstream/port pair, not a
         # whitelist of future file hashes. Preserve compatible upstream deltas.
@@ -144,8 +140,6 @@ def adapt(data, name, adaptations, required=()):
             start = data.index(source)
             replacements.append((start, start + len(source), matches[0]['codex'].encode()))
             active.add(index)
-        elif (index in required or (rule.get('required') and not historical)) and digest not in rule.get('reviewed_absence', []):
-            raise SyncConflict(f'Upstream changed Codex translation {index + 1}: {name}')
     end = 0
     rendered = []
     for start, stop, replacement in sorted(replacements):

@@ -33,10 +33,10 @@ Our daily workflow publishes directly after validation, so conflicts remain a
 hard stop before package writes, version changes or checkpoint advancement. We
 adopt derivation and declared forks while retaining this stricter boundary.
 
-- Small exact translations protect instructions that need a Codex policy choice.
-  Editing a protected input or matching it ambiguously requires review. Portable
-  role identifiers use scoped mechanical substitutions. Ordinary wording and
-  additional instructions outside protected fragments remain upstream-owned.
+- Small translations replace recognized host-specific instructions. Missing or
+  rewritten fragments pass through instead of requiring an exact-source exception.
+  Portable role identifiers use scoped mechanical substitutions. The complete
+  staged package is the compatibility boundary; ambiguous matches still block.
 - Engineering roles retain the source description and body after metadata and
   tool adaptation. The Codex runtime preamble remains authoritative. The parent
   owns the playbook; delegates read the actual absolute skill path supplied by
@@ -71,7 +71,7 @@ name-only change. The October 13 fixture replays both managed paths at pinned
 source `1dcc2bacde73ddd284803b7af28164d0436198fc` from checkpoint
 `1b6d44ff26d4e242f4e8f68c391e6d2f7ca16def`. Tests also apply future semantic edits
 within the role and parent paragraph, preserve local notes and Codex policy,
-reject incompatible role instructions and unknown host flags, prove conflict and
+reject unsupported host flags, prove conflict and
 validation-failure atomicity, and repeat synchronization without changes.
 
 The later October 13 update exposed another complete-file fork: poteto-help had
@@ -85,10 +85,15 @@ parent for its absolute path, instead of searching Cursor installations.
 The `oct13-latest` fixture replays all seven managed paths from `1dcc2bac` to
 `dbf49813` (upstream pstack 0.15.23), including the new in-your-own-words skill
 and ketchup changes. It also tests later help-table edits without new registry
-entries, local-note preservation, protected-instruction conflicts, and an
+entries, local-note preservation, compatibility failures, and an
 unchanged second sync. Historical fixtures derive their expected skill count
 from the package plus the fixture's additions/deletions so new bundled skills
 do not invalidate unrelated regression checks.
+
+The October 14 fixture replays all 39 managed paths from `dbf49813` to
+`1e5c90a4` (pstack 0.15.24). It covers future additions to translated paragraphs
+and complete rewrites using native host instructions. Both sync automatically;
+unsupported Cursor syntax and genuine local edit conflicts still fail atomically.
 
 ## Version and runner policy
 

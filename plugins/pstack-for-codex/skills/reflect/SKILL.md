@@ -24,7 +24,7 @@ Only use an actual host-provided transcript path, or the factual digest above. D
 
 One message, three `spawn_agent` when available calls, the appropriate bundled role prompt, with `model` set as below, agent mode (an explicit role-scope instruction). Reviewers need MCP access for context lookups (tickets, chat threads, observability traces referenced in the exposed transcript or recorded receipts; missing transcript coverage must be labeled). Read-only is a role instruction; connector access follows host policy.
 
-Use the native delegation and model rules in CODEX-RUNTIME.md. Default every role to inherit-parent.
+Use the native delegation and model rules in CODEX-RUNTIME.md. Default every role to inherit-parent. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
 
 | Lens | Role line | Default `model` | Prompt template |
 |---|---|---|---|

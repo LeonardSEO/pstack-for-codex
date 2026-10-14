@@ -152,20 +152,16 @@ class SyncTests(unittest.TestCase):
         for name, content in protected.items():
             self.assertEqual((self.plugin / name).read_text(), content)
 
-    def test_unrecognized_arena_model_change_blocks_without_advancing_checkpoint(self):
-        new, path, protected = self.prepare_arena()
+    def test_unknown_translation_passes_through_for_package_validation(self):
+        new, path, _ = self.prepare_arena()
         self.run_sync(new)
         incoming = self.arena_fixture('upstream-after').replace(
             'If the Task tool rejects a configured entry, run that seat on its family\'s default and say so.',
             'If the Task tool rejects a configured entry, stop every candidate immediately.')
         self.file('skills/arena/SKILL.md', incoming)
-        # A second compatible change must also stay unapplied when one file is ambiguous.
-        self.file('skills/example/reference.md', 'first\nsecond\nupstream third\n')
-        before = self.repo_files()
-        from sync_upstream import SyncConflict
-        with self.assertRaises(SyncConflict):
-            self.run_sync(self.commit())
-        self.assertEqual(self.repo_files(), before)
+        self.assertTrue(self.run_sync(self.commit()))
+        self.assertIn('stop every candidate immediately', path.read_text())
+        self.assertIn('~/.cursor/', path.read_text())
 
     def test_skill_frontmatter_is_normalized_before_merge(self):
         from sync_upstream import normalize_skill
@@ -255,7 +251,7 @@ class SyncTests(unittest.TestCase):
             sync(self.repo, self.upstream, self.commit())
         self.assertEqual(self.repo_files(), before)
 
-    def test_reviewed_instruction_removal_cannot_be_reused_on_a_different_source(self):
+    def test_removed_translation_allows_other_upstream_wording_changes(self):
         fixtures = Path(__file__).parent / 'fixtures/how'
         name = 'skills/how/SKILL.md'
         self.file(name, (fixtures / 'upstream-before.md').read_text())
@@ -266,12 +262,8 @@ class SyncTests(unittest.TestCase):
         target.write_bytes((fixtures / 'codex-before.md').read_bytes())
         incoming = (fixtures / 'upstream-after.md').read_text()
         self.file(name, incoming.replace('Dropping', 'Removing') + '\nUnreviewed additional instruction.\n')
-        before = self.repo_files()
-        from sync_upstream import SyncConflict
-        with self.assertRaisesRegex(SyncConflict, 'translation'):
-            self.run_sync(self.commit())
-        self.assertEqual(self.repo_files(), before)
-        # The exact reviewed source succeeds; its next ordinary wording edit does too.
+        self.assertTrue(self.run_sync(self.commit()))
+        self.assertIn('Unreviewed additional instruction.', target.read_text())
         self.file(name, incoming)
         self.assertTrue(self.run_sync(self.commit()))
         self.file(name, incoming.replace('When in doubt, take the simple path.',

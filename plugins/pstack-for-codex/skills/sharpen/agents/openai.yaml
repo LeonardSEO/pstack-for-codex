@@ -1,0 +1,6 @@
+interface:
+  display_name: Sharpen
+  short_description: Engineering workflow for Codex
+  default_prompt: Use $sharpen for this task.
+policy:
+  allow_implicit_invocation: false

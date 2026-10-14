@@ -64,15 +64,14 @@ class StructuralSyncTests(unittest.TestCase):
         self.assertIn("Collect each delegate's file paths", (self.plugin / 'skills/poteto-mode/SKILL.md').read_text())
         self.assertNotIn('reviewed_files', json.dumps(self.adaptations))
 
-    def test_incompatible_protected_instruction_fails_without_partial_update(self):
+    def test_rewritten_native_role_instruction_is_taken_from_upstream(self):
         path = self.upstream / 'pstack/agents/poteto-agent.md'
+        replacement = 'Read the parent skill and follow the scope assigned by your coordinator.'
         path.write_text(path.read_text().replace(
             "Read the `poteto-mode` skill's `SKILL.md` in full before doing any work, including its inline Principles index.",
-            'Never read the parent skill; invent your own workflow.'))
-        before = self.files()
-        with self.assertRaisesRegex(SyncConflict, 'translation'):
-            sync(self.root, self.upstream, self.commit())
-        self.assertEqual(self.files(), before)
+            replacement))
+        self.assertTrue(sync(self.root, self.upstream, self.commit()))
+        self.assertIn(replacement, (self.plugin / 'agents/poteto-agent.md').read_text())
 
     def test_new_unsupported_agent_instruction_fails_validation_atomically(self):
         path = self.upstream / 'pstack/agents/poteto-agent.md'

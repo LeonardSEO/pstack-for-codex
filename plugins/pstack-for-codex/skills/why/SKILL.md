@@ -15,7 +15,7 @@ Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workf
 
 Investigate the motivation and intent behind code. The companion `how` skill answers what the code does and how it works. `why` answers what forces led to its shape.
 
-Use the native delegation and model rules in CODEX-RUNTIME.md. Default every role to inherit-parent.
+Use the native delegation and model rules in CODEX-RUNTIME.md. Default every role to inherit-parent. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
 
 Use native delegation under CODEX-RUNTIME.md. Read-only is a role scope; access to connectors follows host policy. Investigators and the synthesizer must not modify files or external resources.
 

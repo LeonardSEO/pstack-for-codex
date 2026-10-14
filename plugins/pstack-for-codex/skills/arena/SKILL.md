@@ -19,7 +19,7 @@ Every candidate gets the same prompt, so the prompt is the contract.
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric, 3-6 concrete gradeable criteria for what success looks like on *this* task. It is the picker's tool in Phase D. Candidates only see the task.
-3. Read Candidate count from explicitly loaded .agents/pstack-config.md, default two. Every runner inherits the parent model unless an exposed override is explicitly authorized. Native delegation and sequential fallback follow CODEX-RUNTIME.md. If a configured override is unsupported, report it and inherit the parent.
+3. Read Candidate count from explicitly loaded .agents/pstack-config.md, default two. Every runner inherits the parent model unless an exposed override is explicitly authorized. Native delegation and sequential fallback follow CODEX-RUNTIME.md. If a configured override is unsupported, report it and inherit the parent. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
 4. Give each candidate its own output location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the **separate-before-serializing-shared-state** principle skill.
 
 ## Phase B: Fan out

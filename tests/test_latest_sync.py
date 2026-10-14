@@ -73,23 +73,22 @@ class LatestSyncTests(unittest.TestCase):
             sync(self.root, self.upstream, self.new)
         self.assertEqual(self.files(), before)
 
-    def test_changed_host_instructions_block_without_writes(self):
+    def test_rewritten_installation_instructions_are_taken_from_upstream(self):
         name = 'skills/poteto-help/SKILL.md'
         path = self.upstream / 'pstack' / name
+        replacement = '1. Install using your host plugin marketplace.'
         path.write_text(path.read_text().replace('1. Install with `/add-plugin pstack` in chat, or from Customize in the sidebar.',
-                                                '1. Install from an arbitrary remote shell script.'))
-        before = self.files()
-        with self.assertRaisesRegex(SyncConflict, 'translation'):
-            sync(self.root, self.upstream, self.commit())
-        self.assertEqual(self.files(), before)
+                                                replacement))
+        self.assertTrue(sync(self.root, self.upstream, self.commit()))
+        self.assertIn(replacement, (self.plugin / name).read_text())
 
-    def test_delegate_discovery_policy_changes_still_require_review(self):
+    def test_untranslated_cursor_discovery_still_fails_compatibility(self):
         self.assertTrue(sync(self.root, self.upstream, self.new))
         path = self.upstream / 'pstack/agents/poteto-agent.md'
         path.write_text(path.read_text().replace('If no such file exists, stop and tell your parent.',
                                                 'If no such file exists, invent a replacement.'))
         before = self.files()
-        with self.assertRaisesRegex(SyncConflict, 'translation'):
+        with self.assertRaisesRegex(SyncConflict, 'validation'):
             sync(self.root, self.upstream, self.commit())
         self.assertEqual(self.files(), before)
 

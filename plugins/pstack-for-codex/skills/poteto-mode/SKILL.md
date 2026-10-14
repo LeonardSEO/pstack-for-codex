@@ -90,9 +90,11 @@ Continue authorized work within scope. The user's request and host policies gove
 
 ## Subagents
 
-**Use available native delegation for engineering and helper tasks, with the bundled engineering role prompt.** The chat that receives `/poteto-mode` runs the playbook. Never spawn a `poteto-agent` to run the playbook itself. Engineering delegates read agents/poteto-agent.md and this skill. Routed workflow skills (`how`, `why`, `interrogate`, `reflect`, `swarm`) use their own bundled reference prompts. Respect each role and the Codex runtime contract.
+**Use available native delegation for engineering and helper tasks, with the bundled engineering role prompt.** The chat that receives `/poteto-mode` runs the playbook. Never spawn a `poteto-agent` to run the playbook itself. Routed workflow skills (`how`, `why`, `interrogate`, `reflect`, `swarm`) use their own bundled reference prompts. Respect each role and the Codex runtime contract.
 
 Read CODEX-RUNTIME.md. Give each writer an isolated worktree or disjoint writable scope. Default to inherited model and reasoning effort. Use actual exposed native tools; do not assume hardcoded models, cloud environments, named agent types or unsupported task flags. When tools do not permit delegation, execute the same phases sequentially and label self-review honestly. A required independent shipping verdict remains blocked until an independent reviewer is available.
+
+**Match the model to the job.** Default to the parent model and effort. Change either only when the user or applicable repository instructions authorize an exposed override. Use only values supported by the host. If an override is rejected, report it and inherit the parent. Read agents/poteto-agent.md and this skill before engineering delegate work.
 
 Own and verify every delegated result. Review the diff and write your own summary. Independent runs of one model do not constitute model diversity.
 

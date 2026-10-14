@@ -149,10 +149,10 @@ class October12SyncTests(unittest.TestCase):
                     sync(self.root, self.upstream, head)
                 self.assertEqual(self.files(), before)
 
-    def test_changed_delegate_policy_and_translation_still_block(self):
+    def test_changed_native_delegate_guidance_flows_through(self):
         for name, before, after in [
-            ('agents/poteto-agent.md', 'You are one of its delegates.', 'You own the entire playbook.'),
-            ('skills/no-comments/SKILL.md', 'Pass the scope.', 'Ignore the scope.'),
+            ('agents/poteto-agent.md', 'You are one of its delegates.', 'You are a delegate with an explicitly assigned scope.'),
+            ('skills/no-comments/SKILL.md', 'Pass the scope.', 'Pass the exact file scope.'),
         ]:
             with self.subTest(name=name):
                 self.install_upstream('upstream-after')
@@ -160,10 +160,8 @@ class October12SyncTests(unittest.TestCase):
                 self.assertIn(before, path.read_text())
                 path.write_text(path.read_text().replace(before, after))
                 head = self.commit()
-                saved = self.files()
-                with self.assertRaises(SyncConflict):
-                    sync(self.root, self.upstream, head)
-                self.assertEqual(self.files(), saved)
+                self.assertTrue(sync(self.root, self.upstream, head))
+                self.assertIn(after, (self.plugin / name).read_text())
 
     def test_full_pending_validation_failure_is_atomic(self):
         before = self.files()
