@@ -1,5 +1,3 @@
-> Historical reference only. Not a runnable Codex workflow. See the plugin CODEX-RUNTIME.md.
-
 # benny
 
 benny gives you two cursor automations for slack issue reports. one triages each report. the other reproduces confirmed bugs and may prepare a small draft fix.

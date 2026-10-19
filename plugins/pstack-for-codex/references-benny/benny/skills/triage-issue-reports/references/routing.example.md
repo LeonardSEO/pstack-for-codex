@@ -1,5 +1,3 @@
-> Historical reference only. Not a runnable Codex workflow. See the plugin CODEX-RUNTIME.md.
-
 # Routing map example
 
 Copy this file outside `.cursor/automations/benny/`, for example to `.cursor/benny/routing.md`, and replace every placeholder. Point `routing.map_path` at the copy. Pack refreshes must not overwrite it.

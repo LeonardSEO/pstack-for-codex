@@ -1,5 +1,3 @@
-> Historical reference only. Not a runnable Codex workflow. See the plugin CODEX-RUNTIME.md.
-
 # Feature-map example
 
 Map every user-facing feature Benny may reproduce. Read the relevant section before driving the app. Keep this map at the user point of view. Discover internals and current code paths at runtime instead of freezing them here.

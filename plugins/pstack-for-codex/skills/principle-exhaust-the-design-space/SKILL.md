@@ -7,7 +7,6 @@ description: Apply when facing a novel UI interaction or architectural decision 
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Exhaust the Design Space
 
 It also applies to product design decisions where user experience depends on feel, not logic.

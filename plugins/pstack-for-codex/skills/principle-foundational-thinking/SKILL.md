@@ -7,7 +7,6 @@ description: 'Apply before writing logic: choosing core types and data structure
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Foundational Thinking
 
 **Structural decisions** protect option value. **Code-level decisions** protect simplicity.

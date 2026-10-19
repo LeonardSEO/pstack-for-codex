@@ -8,7 +8,6 @@ description: Explain a body of work plainly so a person actually understands it.
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Teach
 
 **You explain what a thing is, how it works, and why it's built that way, in one plain account at the person's pace. The goal is that they understand it, not that you change anything.**

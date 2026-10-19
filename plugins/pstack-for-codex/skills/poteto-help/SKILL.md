@@ -6,7 +6,6 @@ description: Guides users through pstack setup, /poteto-mode, and picking the sk
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Poteto help
 
 Use the host skill picker or name a skill explicitly, for example `Use pstack-for-codex:poteto-mode to fix this bug and verify its behavior.` Slash names below identify skills; they do not promise a host command or persistent mode. Start each new task by invoking the skill explicitly.
@@ -31,6 +30,7 @@ Check the state that changes the answer, and mention it only when it does:
 
 - Without `.agents/pstack-config.md` in the project, roles inherit the parent model. No setup is required for these defaults.
 - No `verify-*` skill or other app harness in the project means agents have no scripted way to drive the app. Mention `/create-verification-skill` when the question is about proving a change works.
+- No formal verification skill in the project means no property is checked past what tests reach. Mention `/create-formal-verification-skill` when the question is about a race, an invariant, or another case tests rarely hit. When one exists and the code it covers changed after the commit it records as last in sync, mention `/maintain-formal-verification-skill` if the question touches that code.
 
 When project preferences are missing and model choice matters, explain that setup-pstack can record preferences for explicit loading by poteto-mode. The host controls which models and tools are available. Ask at most once per chat whether the user wants to configure preferences.
 
@@ -40,14 +40,16 @@ When project preferences are missing and model choice matters, explain that setu
 ## Get set up
 
 1. Install pstack-for-codex through the host's supported plugin installation flow. See the [README](../../README.md).
-2. Optionally use [setup-pstack](../setup-pstack/SKILL.md) to write project preferences to `.agents/pstack-config.md`. Poteto-mode reads them explicitly; this does not install a host rule.
+2. Optionally use [setup-pstack](../setup-pstack/SKILL.md) to write project preferences to `.agents/pstack-config.md`. Poteto-mode reads them explicitly; this does not install a host rule. Then it offers once each to generate a verification skill and a formal verification skill for the project, unless the project already has one.
 3. Start a real task with `/poteto-mode`, a goal, and a check that can pass or fail.
 
 Installing changes nothing until the user explicitly invokes a skill. Native skill metadata disables implicit invocation. The [README](../../README.md) and [guide page 1](../../docs/guide/01-setup.md) have the details. Offer to word their first prompt with them, per [`references/prompting.md`](references/prompting.md).
 
 If cost is the worry, explain that subagents and review panels spend extra tokens. Use inherited-model defaults, fewer authorized delegates, or supported model preferences from setup-pstack. The host controls model availability and cost. Save poteto-mode for work that needs rigor.
 
-This port adapts pstack for Codex. Native agents depend on the host's capabilities and rules; without them, run phases sequentially. Inherited-model review is not model diversity. This plugin installs no cloud runner, scheduler, connector, webhook or browser. See the [compatibility report](../../COMPATIBILITY.md).
+pstack is built for Cursor, and it also installs in Claude Code with `/plugin marketplace add cursor/plugins`, then `/plugin install pstack@cursor-plugins`. There, each command takes a `pstack:` prefix, such as `/pstack:poteto-mode`. The [Claude Code adapter](../../docs/harness/claude-code.md) maps the Cursor names, and a step that needs a Cursor-only feature, such as Bugbot or Automations, is skipped with a one-line note.
+
+Other tools can read the skills, because they use the Agent Skills format. But most workflow skills, including `/poteto-mode`, `/how`, `/why`, and `/teach`, spawn Cursor subagents with per-role models, and Custom Modes and `/loop` are Cursor features, so those parts may not work there.
 
 ## Start a task with `/poteto-mode`
 
@@ -68,7 +70,7 @@ The default answer is `/poteto-mode`, which runs most of the others when its ste
 | Know why code is shaped this way, or where a number came from | [`/why`](../why/SKILL.md) |
 | Understand a change or subsystem, explained plainly | [`/teach`](../teach/SKILL.md) |
 | Catch up on their own recent work on a topic | [`/recall`](../recall/SKILL.md) |
-| Catch up on what changed in this chat since their last message, in a few plain sentences and small visuals, with enough context to decide each action item | [`/ketchup`](../ketchup/SKILL.md) |
+| Catch up on what changed in this chat since their last message, in plain words and small visuals, with every item waiting on them listed and decidable from the reply alone | [`/ketchup`](../ketchup/SKILL.md) |
 | Know what a small diff could break outside itself | [`/blast-radius`](../blast-radius/SKILL.md) |
 | Settle types and module shape before code that crosses a function boundary | [`/architect`](../architect/SKILL.md) |
 | Get several attempts at one brief, merged into the best one | [`/arena`](../arena/SKILL.md) |
@@ -82,6 +84,8 @@ The default answer is `/poteto-mode`, which runs most of the others when its ste
 | Hear the last reply again in plain words | [`/bro`](../bro/SKILL.md) |
 | Give agents a scripted way to drive the app and prove behavior | [`/create-verification-skill`](../create-verification-skill/SKILL.md) |
 | Bring a verification skill and its feature map back in line with the app | [`/maintain-verification-skill`](../maintain-verification-skill/SKILL.md) |
+| Formally verify a race, invariant, or other property that tests rarely reach | [`/create-formal-verification-skill`](../create-formal-verification-skill/SKILL.md) |
+| Bring a formal verification back in line after the code it covers changed, and learn whether a failure is drift or a bug | [`/maintain-formal-verification-skill`](../maintain-formal-verification-skill/SKILL.md) |
 | Vet a performance number before reporting or acting on it | [`/benchmark-checklist`](../benchmark-checklist/SKILL.md) |
 | Run a large or cross-cutting change, or one to review after stepping away | [`/figure-it-out`](../figure-it-out/SKILL.md) |
 | Keep a decision log during a run, and review it afterward | [`/show-me-your-work`](../show-me-your-work/SKILL.md) |

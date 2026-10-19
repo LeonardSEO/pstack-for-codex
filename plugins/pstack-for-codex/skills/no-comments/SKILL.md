@@ -6,7 +6,6 @@ description: Spawn Comment Sicko, fix accepted findings, and offer encodings for
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # No comments
 
 Spawn Comment Sicko. Act on accepted findings.

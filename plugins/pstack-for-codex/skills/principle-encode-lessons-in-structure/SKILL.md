@@ -7,7 +7,6 @@ description: Apply when you catch yourself writing the same instruction a second
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Encode Lessons in Structure
 
 If the lesson needs judgment and cannot be encoded, make the instruction more prominent and add an example of the failure mode.

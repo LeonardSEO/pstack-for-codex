@@ -1,5 +1,3 @@
-> Historical reference only. Not a runnable Codex workflow. See the plugin CODEX-RUNTIME.md.
-
 # Control-adapter contract
 
 Benny does not know how to start or drive every app. The user must configure one control skill or adapter that implements this contract for the target app.

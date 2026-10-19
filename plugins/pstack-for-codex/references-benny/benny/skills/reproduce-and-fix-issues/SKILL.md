@@ -1,14 +1,8 @@
-> Historical reference only. Not a runnable Codex workflow. See the plugin CODEX-RUNTIME.md.
-
 ---
 name: reproduce-and-fix-issues
-description: Reproduce triaged Slack bugs through a configured app-control adapter,
-  verify existing fixes, and open a bounded draft pull request only after before-and-after
-  proof. Use only from the configured Benny repro automation.
+description: Reproduce triaged Slack bugs through a configured app-control adapter, verify existing fixes, and open a bounded draft pull request only after before-and-after proof. Use only from the configured Benny repro automation.
+disable-model-invocation: true
 ---
-
-Read [Codex runtime contract](../../../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
-
 
 # Reproduce and fix issues
 

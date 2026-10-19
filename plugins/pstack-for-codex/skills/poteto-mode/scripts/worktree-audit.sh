@@ -61,7 +61,9 @@ elif raw=$(gh pr list --author "@me" --state all --limit 1000 \
 fi
 [ -s "$prs" ] || echo "[]" > "$prs"
 
-transcripts="${PSTACK_TRANSCRIPTS_DIR:-}"
+# Transcripts dir: ~/.cursor/projects/<slugified-repo-path>/agent-transcripts.
+slug=$(printf '%s' "$main_wt" | sed 's#^/##; s#/#-#g')
+transcripts="$HOME/.cursor/projects/$slug/agent-transcripts"
 now=$(date +%s)
 
 echo "# base: $base"

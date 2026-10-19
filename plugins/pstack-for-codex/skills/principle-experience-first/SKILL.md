@@ -7,7 +7,6 @@ description: Apply when product, UX, or feature-scope tradeoffs come up. Choose 
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Experience First
 
 When implementation convenience conflicts with user delight, choose delight.

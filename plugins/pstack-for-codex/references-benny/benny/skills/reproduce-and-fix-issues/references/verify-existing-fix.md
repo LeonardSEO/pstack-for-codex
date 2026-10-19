@@ -1,5 +1,3 @@
-> Historical reference only. Not a runnable Codex workflow. See the plugin CODEX-RUNTIME.md.
-
 # Verify an existing fix
 
 Use this mode when an open pull request or merged commit plausibly fixes the report.

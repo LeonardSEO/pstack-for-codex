@@ -7,7 +7,6 @@ description: Apply when sequencing an addition, refactor, or rewrite. Remove dea
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Subtract Before You Add
 
 When evolving a system, remove complexity first, then build. Default to subtraction.

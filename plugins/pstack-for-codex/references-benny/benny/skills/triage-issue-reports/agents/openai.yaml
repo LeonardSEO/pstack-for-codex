@@ -1,8 +1,0 @@
-interface:
-  display_name: Triage Issue Reports
-  short_description: Triage Slack issue reports with one thread-only verdict, evidence
-    review, cause-aware rout
-  default_prompt: Use $triage-issue-reports for the requested task, following the
-    Codex runtime contract.
-policy:
-  allow_implicit_invocation: false

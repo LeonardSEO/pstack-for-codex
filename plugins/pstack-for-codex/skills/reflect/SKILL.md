@@ -7,7 +7,6 @@ description: Spawn three parallel review subagents over the active transcript, s
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Reflect
 
 Mine the current conversation for durable learnings, then route them into skill edits.

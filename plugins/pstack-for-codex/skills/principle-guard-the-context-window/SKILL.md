@@ -7,7 +7,6 @@ description: 'Apply when context is filling up: large outputs, long files, repea
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Guard the Context Window
 
 **Why:** Context overflow degrades reasoning quality, creates compression artifacts, and halts progress.

@@ -7,7 +7,6 @@ description: Apply during planned rewrites and migrations with explicit phase bo
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Outcome-Oriented Execution
 
 Optimize for the intended, verifiable end state rather than preserving smooth intermediate states.

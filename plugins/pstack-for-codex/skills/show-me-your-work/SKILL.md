@@ -8,7 +8,6 @@ description: 'Keep a reviewable decision trail for long-running or unattended wo
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Show me your work
 
 Keep one canonical log.

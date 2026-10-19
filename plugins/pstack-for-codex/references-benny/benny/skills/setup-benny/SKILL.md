@@ -1,14 +1,8 @@
-> Historical reference only. Not a runnable Codex workflow. See the plugin CODEX-RUNTIME.md.
-
 ---
 name: setup-benny
-description: Configure Benny and prepare its triage and repro automations. Use when
-  installing Benny or changing its Slack, tracker, repository, routing, control, model,
-  or budget settings.
+description: Configure Benny and prepare its triage and repro automations. Use when installing Benny or changing its Slack, tracker, repository, routing, control, model, or budget settings.
+disable-model-invocation: true
 ---
-
-Read [Codex runtime contract](../../../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
-
 
 # Set up Benny
 

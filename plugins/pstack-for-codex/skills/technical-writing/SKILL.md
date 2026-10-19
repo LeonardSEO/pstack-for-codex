@@ -7,7 +7,6 @@ description: "Layered technical-writing standard: Di\xE1taxis structure, Google 
 
 Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. It governs tools, delegation, models, authorization and fallbacks.
 
-
 # Technical writing
 
 Write so a tired engineer understands on the first read. Apply all four layers.
