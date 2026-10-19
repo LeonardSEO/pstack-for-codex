@@ -101,13 +101,13 @@ The port adapts the workflows to Codex’s exposed capabilities:
 
 The package supplies skills, playbooks, reference prompts, and portable helpers. Browser access, forge authentication, credentials, MCP servers, and cloud runners depend on your host. Session loops end with the session; future wakeups require a separate scheduling capability. Benny resources are retained as historical references.
 
-Read the [runtime contract](plugins/pstack-for-codex/CODEX-RUNTIME.md) for execution rules and the [compatibility report](plugins/pstack-for-codex/COMPATIBILITY.md) for conversion scope and verification limits. Helper scripts may require their documented runtimes, such as Bash, Node, Bun, `git`, `gh`, or `jq`.
+Read the [runtime contract](plugins/pstack-for-codex/CODEX-RUNTIME.md) for execution rules and the [sync design](docs/upstream-sync-design.md) for conversion scope and verification limits. Helper scripts may require their documented runtimes, such as Bash, Node, Bun, `git`, `gh`, or `jq`.
 
 ## Updates and releases
 
 ### Follow validated updates on main
 
-A [GitHub Action](.github/workflows/sync-upstream.yml) checks pstack upstream daily at **04:17 UTC** and supports manual runs. It merges compatible upstream changes with the Codex adaptations, runs validation, copies the version from the upstream pstack manifest, and commits to `main`. It then publishes a matching GitHub release: upstream version `0.15.23` becomes plugin version `0.15.23` and tag `v0.15.23`, with release notes, a ZIP snapshot, and a SHA-256 checksum. Conflicts, unsupported instructions, or validation failures stop publication. The synchronizer requires no AI API key and does not execute upstream helper code.
+A [GitHub Action](.github/workflows/sync-upstream.yml) checks pstack upstream daily at **04:17 UTC** and supports manual runs. Upstream is authoritative: it replaces local differences in imported files, adds new content and removes files deleted upstream. A complete candidate is built and checked before it is committed directly to `main`, then the existing versioned release procedure runs. Content warnings do not block publication; source retrieval, unsafe paths and invalid package structure do. No review PR or AI API key is required, and upstream helper code is not executed during synchronization.
 
 Refresh your installation:
 
@@ -140,13 +140,15 @@ python3 -m unittest discover -s tests -v
 python3 scripts/validate.py
 ```
 
-The sync uses the commit in [`upstream.json`](upstream.json) as its source base. It normalizes skill metadata and applies the reviewed Codex translations in [`scripts/codex_adaptations.json`](scripts/codex_adaptations.json) to both upstream revisions before merging with the live fork. This lets wording changes around translated instructions flow through while preserving separately maintained fork edits. The runtime contract and independent review skill remain maintained in this fork.
+The commit in [`upstream.json`](upstream.json) records the last copied source. It is not a merge base. The synchronizer reads the complete committed `pstack` tree and rebuilds the package from it, including previously unknown directories and executable file modes. Do not edit imported files to maintain a permanent fork: the next sync overwrites those edits, even if upstream has not changed.
 
-Translations replace recognized host-specific fragments, while scoped mechanical substitutions adapt portable role identifiers. Rewritten or removed fragments pass through as upstream text; they no longer require a new exception entry. The complete staged package must pass Codex compatibility validation. Duplicate matches and conflicting local edits still stop the sync. Intentional policy forks declare an immutable normalized upstream/port pair and a rationale; compatible upstream changes merge against that pair instead of requiring a new whole-file hash. Engineering roles preserve upstream descriptions and bodies under the Codex runtime contract. Historical compact rewrites migrate through a three-way merge that preserves genuine local edits or blocks on a collision.
+The Codex manifest, marketplace entry, runtime contract, existing Codex skill metadata and the independent review skill/license remain locally owned. Native host configuration is stored below `references-host`, and automation examples below `references-benny`, without activating host integrations. The plugin's imported README and guides follow upstream; this repository README describes the Codex installation.
 
-Read the [sync design and pstack-claude comparison](docs/upstream-sync-design.md) for the derivation, fork ownership and publication tradeoffs. To extend a translation or policy fork, compare both source revisions and the current fork, preserve the intended upstream behavior under the Codex runtime contract, and add a regression. Never manufacture an upstream base from the live fork or add a blanket ours/theirs resolution.
+Known translations in [`scripts/codex_adaptations.json`](scripts/codex_adaptations.json) are applied when unambiguous. Missing or overlapping matches retain upstream text and produce warnings. Unknown host instructions, model names and broken content links are warnings, not publication gates. The [runtime contract](plugins/pstack-for-codex/CODEX-RUNTIME.md) governs execution; a successful sync does not prove that every upstream integration works in Codex.
 
-The synchronizer validates a staged copy of the complete proposed package before writing files, updating the saved version, or advancing the checkpoint. A repeated sync of the same source is a validated no-op. The workflow validates again before committing or releasing. Package checks validate metadata, local skill links, and compatibility rules; they do not prove every workflow or external integration works in your environment.
+The Action publishes a JSON/Markdown report with the source commit, file counts, warnings and push/release status. If `main` changes before the push, the candidate is rebuilt from the new main in a fresh temporary worktree, up to three attempts, without force-pushing. An unchanged candidate creates no empty commit. Published releases remain immutable even when `main` changes within the same upstream version.
+
+See the [sync design](docs/upstream-sync-design.md) for ownership and failure behavior. Tests replay the October regressions, verify upstream overwrite/deletion, and exercise direct pushes, races and denied pushes against local Git remotes.
 
 ## Credits and license
 

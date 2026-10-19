@@ -40,25 +40,18 @@ jobs:
           fetch-depth: 0
           sparse-checkout: pstack
           persist-credentials: false
-      - name: Merge upstream with Codex adaptations
-        run: python scripts/sync_upstream.py --upstream-dir .upstream
-      - name: Validate before publication
-        run: python scripts/validate.py
-      - name: Commit compatible changes directly to main
-        shell: bash
-        run: |
-          set -euo pipefail
-          git add -- plugins/pstack-for-codex upstream.json
-          if git diff --cached --quiet; then
-            echo "No upstream changes to publish."
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'chore: sync upstream pstack with Codex adaptations'
-          git push origin HEAD:main
-      - name: Publish the validated plugin version
+      - name: Synchronize authoritative upstream and publish to main
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: bash scripts/release.sh
+        run: >-
+          python scripts/publish_sync.py
+          --upstream-dir .upstream
+          --report "${{ runner.temp }}/pstack-sync-report.json"
+      - name: Upload synchronization report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pstack-sync-report
+          path: ${{ runner.temp }}/pstack-sync-report.*
+          if-no-files-found: warn

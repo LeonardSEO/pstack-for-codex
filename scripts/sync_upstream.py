@@ -1,3 +1,4 @@
+"""Rebuild the Codex package from an authoritative, complete upstream Git tree."""
 import argparse
 import json
 import os
@@ -8,19 +9,17 @@ import tempfile
 from pathlib import Path, PurePosixPath
 
 import yaml
-
 from validate import validate
 
-
-# This cursor-team-kit import is maintained separately from pstack, even if
-# pstack later introduces or removes a skill with the same name.
 PRESERVED_SKILL_PATH = 'skills/thermo-nuclear-code-quality-review'
 ADAPTATIONS_PATH = Path(__file__).with_name('codex_adaptations.json')
 SKILL_PATH = re.compile(r'skills/[^/]+/SKILL.md')
+OWNED_FILES = {'plugin.json', 'CODEX-RUNTIME.md', 'LICENSE-cursor-team-kit'}
+HOST_FILES = {'AGENTS.md', 'CLAUDE.md', 'GEMINI.md', 'plugin.json', 'mcp.json'}
 
 
 class SyncConflict(RuntimeError):
-    pass
+    """A source, filesystem or package-structure error (not a text conflict)."""
 
 
 def git(repo, *args):
@@ -28,292 +27,233 @@ def git(repo, *args):
 
 
 def snapshot(repo, ref):
+    # Read committed blobs, never a possibly incomplete sparse working tree.
     try:
         entries = git(repo, 'ls-tree', '-rz', f'{ref}:pstack')
-    except subprocess.CalledProcessError as error:
-        raise SyncConflict('Upstream pstack tree is missing or inaccessible') from error
-    result = {}
-    for entry in entries.split(b'\0'):
-        if not entry:
-            continue
-        metadata, path = entry.split(b'\t', 1)
-        mode, kind, oid = metadata.split()
-        name = path.decode('utf-8')
-        if name == PRESERVED_SKILL_PATH or name.startswith(PRESERVED_SKILL_PATH + '/'):
-            continue
-        if mode not in (b'100644', b'100755') or kind != b'blob':
-            raise SyncConflict(f'Unsupported upstream file mode: {name}')
-        if '..' in PurePosixPath(name).parts or name.startswith('/'):
-            raise SyncConflict(f'Unsafe path: {name}')
-        if name.startswith(('skills/', 'agents/', 'assets/', 'docs/', 'automations/')) or name == 'LICENSE':
+        result = {}
+        for entry in entries.split(b'\0'):
+            if not entry:
+                continue
+            metadata, raw_path = entry.split(b'\t', 1)
+            mode, kind, oid = metadata.split()
+            name = raw_path.decode('utf-8')
+            if mode not in (b'100644', b'100755') or kind != b'blob':
+                raise SyncConflict(f'Unsupported upstream file mode: {name}')
+            parts = PurePosixPath(name).parts
+            if '..' in parts or name.startswith('/') or '.git' in parts or '\\' in name:
+                raise SyncConflict(f'Unsafe path: {name}')
             result[name] = (git(repo, 'cat-file', 'blob', oid.decode()), int(mode, 8) & 0o777)
-    return result
+        if not result:
+            raise SyncConflict('Upstream pstack tree is empty')
+        return result
+    except (subprocess.CalledProcessError, UnicodeError) as error:
+        raise SyncConflict('Upstream pstack tree or blob is missing or inaccessible') from error
+
+
+def preserved(name):
+    return name in OWNED_FILES or name == PRESERVED_SKILL_PATH or name.startswith(PRESERVED_SKILL_PATH + '/')
 
 
 def target_path(name):
-    return name.replace('automations/', 'references-benny/', 1) if name.startswith('automations/') else name
+    parts = PurePosixPath(name).parts
+    if name.startswith('automations/'):
+        return 'references-benny/' + name[len('automations/'):]
+    if (any(part.startswith('.') for part in parts) or 'hooks' in parts[:-1]
+            or parts[-1] in HOST_FILES or parts[-1] in {'.mcp.json', '.cursorrules'}):
+        return 'references-host/' + name
+    return name
 
 
 def normalize_skill(data, name):
-    text = data.decode('utf-8')
-    parts = text.split('---', 2)
-    if len(parts) != 3 or parts[0].strip():
-        raise SyncConflict(f'Invalid skill frontmatter: {name}')
     try:
+        parts = data.decode('utf-8').split('---', 2)
+        if len(parts) != 3 or parts[0].strip():
+            raise ValueError('missing frontmatter')
         front = yaml.safe_load(parts[1])
-    except yaml.YAMLError as error:
+        if not isinstance(front, dict) or not isinstance(front.get('description'), str) or not front['description'].strip():
+            raise ValueError('missing description')
+    except (ValueError, UnicodeError, yaml.YAMLError) as error:
         raise SyncConflict(f'Invalid skill frontmatter: {name}') from error
-    if not isinstance(front, dict) or not isinstance(front.get('description'), str):
-        raise SyncConflict(f'Missing skill description: {name}')
-    skill_name = PurePosixPath(name).parent.name
     body = parts[2].lstrip()
-    if 'CODEX-RUNTIME.md' not in body:
-        body = ('Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. '
-                'It governs tools, delegation, models, authorization and fallbacks.\n\n\n' + body)
-    header = yaml.safe_dump({'name': skill_name, 'description': front['description']}, sort_keys=False).strip()
+    preamble = ('Read [Codex runtime contract](../../CODEX-RUNTIME.md) before applying this workflow. '
+                'It governs tools, delegation, models, authorization and fallbacks.')
+    if not body.startswith(preamble):
+        body = preamble + '\n\n' + body
+    header = yaml.safe_dump({'name': PurePosixPath(name).parent.name, 'description': front['description']}, sort_keys=False).strip()
     return f'---\n{header}\n---\n\n{body}'.encode()
 
 
-def canonical_source(data, name, entry):
-    if SKILL_PATH.fullmatch(name):
-        data = normalize_skill(data, name)
-    if entry.get('normalize_agent_name') or entry.get('role'):
-        data = normalize_agent_name(data, name)
-    return data
-
-
-def derive_role(data, name):
-    parts = data.decode().split('---', 2)
-    front = yaml.safe_load(parts[1])
-    if (set(front) != {'name', 'description', 'is_background'}
-            or not isinstance(front['description'], str)
-            or front['is_background'] is not True):
-        raise SyncConflict(f'Unsupported engineering role metadata: {name}')
-    return ('# Engineering delegate\n\n'
-            'Read ../CODEX-RUNTIME.md. These are role instructions, not a registered native agent type. '
-            'Stay within the assigned writable scope; verify behavior and return paths, checks, evidence and blockers. '
-            'Do not assume another model, cloud machine or credentials.\n\n'
-            f"Role: {front['description']}\n\n{parts[2].lstrip()}").encode()
-
-
-def adapt(data, name, adaptations, required=()):
-    """Render known upstream instructions for Codex before a three-way merge.
-
-    Translate recognized host instructions and keep other upstream changes.
-    The complete staged package must pass Codex compatibility validation.
-    The live fork is never used to manufacture this merge base.
-    """
+def adapt(data, name, adaptations, warnings=None):
+    """Apply unambiguous known translations; source wins when wording changes."""
+    warnings = warnings if warnings is not None else []
     entry = adaptations.get(name, {})
-    data = canonical_source(data, name, entry)
-    if 'forks' in entry:
-        # A declared policy fork is an immutable upstream/port pair, not a
-        # whitelist of future file hashes. Preserve compatible upstream deltas.
-        exact = [fork['codex'].encode() for fork in entry['forks']
-                 if fork['upstream'].encode() == data]
-        candidates = set(exact)
-        if not exact:
-            for fork in entry['forks']:
-                try:
-                    candidates.add(merge(fork['codex'].encode(), fork['upstream'].encode(), data, name))
-                except SyncConflict:
-                    continue
-        if len(candidates) != 1:
-            raise SyncConflict(f'Conflicting or ambiguous declared Codex fork: {name}')
-        return candidates.pop(), set()
-    if entry.get('role') == 'engineering':
-        data = derive_role(data, name)
-    for replacement in entry.get('substitutions', []):
-        data = data.replace(replacement['upstream'].encode(), replacement['codex'].encode())
-    active = set()
-    # Match all inputs against the same source, so one translation cannot trigger
-    # another translation or accidentally consume its output.
     replacements = []
+    active = set()
     for index, rule in enumerate(entry.get('rules', [])):
-        matches = [variant for variant in rule['variants']
-                   if variant['upstream'].encode() in data]
-        if len(matches) > 1:
-            raise SyncConflict(f'Ambiguous Codex translation {index + 1}: {name}')
-        if matches:
-            source = matches[0]['upstream'].encode()
-            if not source or data.count(source) != 1:
-                raise SyncConflict(f'Ambiguous Codex translation {index + 1}: {name}')
-            start = data.index(source)
-            replacements.append((start, start + len(source), matches[0]['codex'].encode()))
-            active.add(index)
-    end = 0
-    rendered = []
-    for start, stop, replacement in sorted(replacements):
-        if start < end:
-            raise SyncConflict(f'Overlapping Codex translations: {name}')
+        matches = [v for v in rule['variants'] if v['upstream'].encode() in data]
+        if len(matches) != 1 or not matches[0]['upstream'] or data.count(matches[0]['upstream'].encode()) != 1:
+            warnings.append(f'{name}: translation {index + 1} missing or ambiguous; upstream retained')
+            continue
+        source = matches[0]['upstream'].encode()
+        start = data.index(source)
+        replacements.append((start, start + len(source), matches[0]['codex'].encode(), index))
+    # Never apply either side of overlapping rules.
+    overlaps = {i for i, a in enumerate(replacements) for j, b in enumerate(replacements)
+                if i != j and a[0] < b[1] and b[0] < a[1]}
+    if overlaps:
+        warnings.append(f'{name}: overlapping translations; upstream retained for affected fragments')
+    end, rendered = 0, []
+    for start, stop, replacement, index in sorted(r for i, r in enumerate(replacements) if i not in overlaps):
         rendered.extend((data[end:start], replacement))
+        active.add(index)
         end = stop
     rendered.append(data[end:])
-    return b''.join(rendered), active
-
-
-def normalize_agent_name(data, name):
-    """Ignore only a reviewed role's single-line display name, not its policy.
-
-    Keep all other source bytes in the reviewed digest. Reject YAML constructs
-    that could hide another instruction or an ambiguous name declaration.
-    """
-    text = data.decode('utf-8')
-    parts = text.split('---', 2)
-    if len(parts) != 3 or parts[0].strip():
-        raise SyncConflict(f'Invalid agent frontmatter: {name}')
-    try:
-        front = yaml.safe_load(parts[1])
-        node = yaml.compose(parts[1])
-    except yaml.YAMLError as error:
-        raise SyncConflict(f'Invalid agent frontmatter: {name}') from error
-    if isinstance(node, yaml.MappingNode):
-        keys = [key.value for key, _ in node.value]
-        if len(keys) != len(set(keys)):
-            raise SyncConflict(f'Duplicate agent metadata: {name}')
-    names = list(re.finditer(r'^name: ([^\r\n]+)$', parts[1], re.M))
-    if (not isinstance(front, dict) or not isinstance(front.get('name'), str)
-            or len(names) != 1):
-        raise SyncConflict(f'Invalid agent name: {name}')
-    raw_name = names[0].group(1)
-    # Only plain display names. Comments, tags, anchors and multiline values
-    # can contain additional instructions and must remain review failures.
-    if (not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 _-]*', raw_name)
-            or raw_name != front['name']):
-        raise SyncConflict(f'Invalid agent name: {name}')
-    parts[1] = (parts[1][:names[0].start()] + 'name: ' + PurePosixPath(name).stem
-                + parts[1][names[0].end():])
-    return '---'.join(parts).encode()
-
-
-def merge(current, base, incoming, name):
-    if current == base or current == incoming:
-        return incoming
-    if b'\0' in current + base + incoming:
-        raise SyncConflict(f'Binary file modified on both sides: {name}')
-    with tempfile.TemporaryDirectory() as tmp:
-        paths = []
-        for label, content in [('codex', current), ('base', base), ('upstream', incoming)]:
-            p = Path(tmp) / label
-            p.write_bytes(content)
-            paths.append(str(p))
-        run = subprocess.run(['git', 'merge-file', '-p', *paths], capture_output=True)
-        if run.returncode:
-            raise SyncConflict(f'Conflicting upstream and Codex edits: {name}')
-        return run.stdout
-
-
-def write_changes(changes, root, destination):
-    for target in changes:
-        path = destination / target.relative_to(root)
-        parents = target.relative_to(root).parents
-        if path.is_symlink() or any((destination / parent).is_symlink()
-                                    for parent in parents if parent != Path('.')):
-            raise SyncConflict(f'Cannot write through a fork symlink: {target.relative_to(root)}')
-    for target, value in changes.items():
-        path = destination / target.relative_to(root)
-        if value is None:
-            if path.exists():
-                path.unlink()
+    data = b''.join(rendered)
+    for replacement in entry.get('substitutions', []):
+        source = replacement['upstream'].encode()
+        if source and source in data:
+            data = data.replace(source, replacement['codex'].encode())
         else:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(value[0])
-            os.chmod(path, value[1])
+            warnings.append(f'{name}: substitution missing; upstream retained')
+    if SKILL_PATH.fullmatch(name):
+        data = normalize_skill(data, name)
+    if name.startswith('agents/') and name.endswith('.md'):
+        data = b'Read ../CODEX-RUNTIME.md before applying these role instructions.\n\n' + data
+    return data, active
 
 
-def validate_candidate(root, validator):
-    try:
-        validator(root)
-    except Exception as error:
-        raise SyncConflict(f'Proposed package failed validation: {error}') from error
+def inventory(root):
+    result = {}
+    if root.is_symlink():
+        raise SyncConflict(f'Cannot use symlink: {root}')
+    for path in root.rglob('*'):
+        if path.is_symlink():
+            raise SyncConflict(f'Cannot use symlink: {path}')
+        if path.is_file():
+            result[path.relative_to(root).as_posix()] = (path.read_bytes(), path.stat().st_mode & 0o777)
+    return result
 
 
-def sync(root, upstream, ref, validator=validate):
-    root, upstream = Path(root), Path(upstream)
+def sync(root, upstream, ref, validator=validate, report=None):
+    root, upstream = Path(root).resolve(), Path(upstream).resolve()
+    report = report if report is not None else {}
+    warnings = []
     state_path = root / 'upstream.json'
     state = json.loads(state_path.read_text())
-    head = git(upstream, 'rev-parse', f'{ref}^{{commit}}').decode().strip()
     try:
-        version = json.loads(git(upstream, 'show', f'{head}:pstack/.cursor-plugin/plugin.json'))['version']
+        head = git(upstream, 'rev-parse', f'{ref}^{{commit}}').decode().strip()
+    except subprocess.CalledProcessError as error:
+        raise SyncConflict('Upstream ref is missing or inaccessible') from error
+    source = snapshot(upstream, head)
+    if not any(SKILL_PATH.fullmatch(name) and not preserved(name) for name in source):
+        raise SyncConflict('Upstream package has no skills; refusing an empty replacement')
+    try:
+        version = json.loads(source['.cursor-plugin/plugin.json'][0])['version']
         if not isinstance(version, str) or not re.fullmatch(r'\d+\.\d+\.\d+', version):
-            raise ValueError('Expected a major.minor.patch version')
-    except (subprocess.CalledProcessError, ValueError, KeyError, TypeError) as error:
+            raise ValueError('expected major.minor.patch')
+    except (ValueError, KeyError, TypeError) as error:
         raise SyncConflict('Missing or invalid upstream pstack version') from error
     plugin = root / 'plugins/pstack-for-codex'
-    manifest_path = plugin / 'plugin.json'
-    manifest = json.loads(manifest_path.read_text())
-    old = snapshot(upstream, state['commit'])
-    new = snapshot(upstream, head)
-    if old == new and manifest['version'] == version:
-        if validator is not None:
-            validate_candidate(root, validator)
-        return False
+    if (root / 'plugins').is_symlink() or state_path.is_symlink():
+        raise SyncConflict('Cannot write through a package/state symlink')
+    current = inventory(plugin)
+    desired = {n: v for n, v in current.items() if preserved(n)}
     adaptations = json.loads(ADAPTATIONS_PATH.read_text())
-    changes = {}
-    for name in sorted(old.keys() | new.keys()):
-        if old.get(name) == new.get(name):
+    targets = set()
+    for name, (data, mode) in source.items():
+        if preserved(name):
             continue
-        target = plugin / target_path(name)
-        current = target.read_bytes() if target.is_file() else None
-        before = old[name][0] if name in old else None
-        after = new[name][0] if name in new else None
-        required = set()
-        if before is not None:
-            source_before = canonical_source(before, name, adaptations.get(name, {}))
-            before, required = adapt(before, name, adaptations)
-            # One-time migration of historical compact rewrites to granular
-            # derivation. Three-way merge retains real local edits, or blocks.
-            for legacy in adaptations.get(name, {}).get('legacy_renderings', []):
-                if source_before == legacy['upstream'].encode() and current is not None:
-                    current = merge(current, legacy['codex'].encode(), before, name)
-                    break
-        if after is not None:
-            after, _ = adapt(after, name, adaptations, required)
-        if after is None:
-            if current is not None and current != before:
-                raise SyncConflict(f'Upstream deleted a Codex-modified file: {name}')
-            changes[target] = None
-            continue
-        if before is None:
-            if current is not None and current != after:
-                raise SyncConflict(f'New upstream file collides with fork file: {name}')
-            content = after
-        elif current is None:
-            raise SyncConflict(f'Upstream changed a locally deleted file: {name}')
+        target = target_path(name)
+        if target in targets:
+            raise SyncConflict(f'Upstream destination collision: {target}')
+        targets.add(target)
+        if target.startswith('references-host/'):
+            desired[target] = (data, mode)
         else:
-            content = merge(current, before, after, name)
-        if SKILL_PATH.fullmatch(name):
-            content = normalize_skill(content, name)
-            meta = target.parent / 'agents/openai.yaml'
-            if not meta.exists():
-                skill_name = target.parent.name
-                changes[meta] = (yaml.safe_dump({'interface': {'display_name': skill_name.replace('-', ' ').title(), 'short_description': 'Engineering workflow for Codex', 'default_prompt': f'Use ${skill_name} for this task.'}, 'policy': {'allow_implicit_invocation': False}}, sort_keys=False).encode(), 0o644)
-        changes[target] = (content, new[name][1])
+            desired[target] = (adapt(data, name, adaptations, warnings=warnings)[0], mode)
+    # Metadata is generated/owned by Codex, not inherited from another host.
+    for name in list(desired):
+        if not SKILL_PATH.fullmatch(name) or preserved(name):
+            continue
+        skill_name = PurePosixPath(name).parent.name
+        meta = str(PurePosixPath(name).parent / 'agents/openai.yaml')
+        desired[meta] = current.get(meta, (yaml.safe_dump({
+            'interface': {'display_name': skill_name.replace('-', ' ').title(),
+                          'short_description': 'Engineering workflow for Codex',
+                          'default_prompt': f'Use ${skill_name} for this task.'},
+            'policy': {'allow_implicit_invocation': False}}, sort_keys=False).encode(), 0o644))
+    manifest = json.loads(current['plugin.json'][0])
     manifest['version'] = version
+    desired['plugin.json'] = ((json.dumps(manifest, indent=2) + '\n').encode(), 0o644)
     state['commit'] = head
-    changes[manifest_path] = ((json.dumps(manifest, indent=2) + '\n').encode(), 0o644)
-    changes[state_path] = ((json.dumps(state, indent=2) + '\n').encode(), 0o644)
-    if validator is not None:
-        with tempfile.TemporaryDirectory() as tmp:
-            staged = Path(tmp) / 'candidate'
-            def ignore_checkout(directory, names):
-                if Path(directory).resolve() == root.resolve():
-                    return set(names) & {'.git', '.upstream'}
-                return set()
-            shutil.copytree(root, staged, symlinks=True,
-                            ignore=ignore_checkout)
-            write_changes(changes, root, staged)
-            validate_candidate(staged, validator)
-    write_changes(changes, root, root)
-    return True
+    state_bytes = (json.dumps(state, indent=2) + '\n').encode()
+    report.update(source_commit=head, version=version,
+                  added=len(desired.keys() - current.keys()),
+                  deleted=len(current.keys() - desired.keys()),
+                  modified=sum(desired[n] != current[n] for n in desired.keys() & current.keys()))
+    # Stage only the package and its schema/marketplace dependencies. Do not copy
+    # a caller's unrelated working files, credentials or Git metadata.
+    with tempfile.TemporaryDirectory(dir=root.parent, prefix='.sync-candidate-') as tmp:
+        staged = Path(tmp)
+        for name in ['schemas', '.agents']:
+            if (root / name).exists():
+                shutil.copytree(root / name, staged / name)
+        candidate = staged / 'plugins/pstack-for-codex'
+        candidate.mkdir(parents=True)
+        for name, (data, mode) in desired.items():
+            path = candidate / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            path.chmod(mode)
+        (staged / 'upstream.json').write_bytes(state_bytes)
+        if validator is not None:
+            try:
+                if validator is validate:
+                    validate(staged, warnings=warnings)
+                else:
+                    validator(staged)
+            except Exception as error:
+                raise SyncConflict(f'Proposed package failed validation: {error}') from error
+        changed = desired != current or state_bytes != state_path.read_bytes()
+        if changed:
+            backup = staged / 'previous-plugin'
+            previous_state = state_path.read_bytes()
+            plugin.rename(backup)
+            try:
+                candidate.rename(plugin)
+                replacement = staged / 'upstream.json'
+                os.replace(replacement, state_path)
+            except Exception:
+                if plugin.exists():
+                    shutil.rmtree(plugin)
+                backup.rename(plugin)
+                state_path.write_bytes(previous_state)
+                raise
+    report.update(status='UPDATED' if changed else 'UNCHANGED', warnings=sorted(set(warnings)))
+    return changed
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument('--upstream-dir', type=Path, required=True)
     parser.add_argument('--ref', default='HEAD')
+    parser.add_argument('--report', type=Path)
     args = parser.parse_args()
+    report = {}
     try:
-        print('UPDATED' if sync(args.repo, args.upstream_dir, args.ref) else 'UNCHANGED')
-    except SyncConflict as error:
-        parser.exit(1, f'Sync blocked: {error}\n')
+        sync(args.repo, args.upstream_dir, args.ref, report=report)
+    except Exception as error:
+        report.update(status='ERROR', error=str(error))
+        raise
+    finally:
+        if args.report:
+            args.report.write_text(json.dumps(report, indent=2) + '\n')
+    print(report['status'])
+    print(f"Source {report['source_commit']}: +{report['added']} ~{report['modified']} -{report['deleted']}")
+    for warning in report['warnings']:
+        print(f'WARNING: {warning}')
+
+
+if __name__ == '__main__':
+    main()

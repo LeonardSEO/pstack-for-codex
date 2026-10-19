@@ -7,7 +7,8 @@ import jsonschema
 import yaml
 
 
-def validate(root):
+def validate(root, warnings=None):
+    warnings = warnings if warnings is not None else []
     root = Path(root)
     plugin = root / 'plugins/pstack-for-codex'
     manifest = json.loads((plugin / 'plugin.json').read_text())
@@ -26,6 +27,8 @@ def validate(root):
     entry = marketplace['plugins'][0]
     assert entry['name'] == manifest['name']
     assert entry['source'] == {'source': 'local', 'path': './plugins/pstack-for-codex'}
+    assert (plugin / 'CODEX-RUNTIME.md').is_file(), 'Codex runtime contract is missing'
+    assert (plugin / 'CODEX-RUNTIME.md').read_text().strip(), 'Codex runtime contract is empty'
     skills = list((plugin / 'skills').glob('*/SKILL.md'))
     assert skills
     assert (plugin / 'skills/thermo-nuclear-code-quality-review/SKILL.md').is_file(), 'Required independent review skill is missing'
@@ -39,19 +42,23 @@ def validate(root):
         assert 'CODEX-RUNTIME.md' in path.read_text(), path
         metadata = yaml.safe_load((path.parent / 'agents/openai.yaml').read_text())
         assert metadata['policy']['allow_implicit_invocation'] is False, path
-    instructional_files = list((plugin / 'skills').rglob('*.md')) + list((plugin / 'agents').rglob('*.md'))
+    instructional_files = list(plugin.rglob('*.md'))
     for path in instructional_files:
         text = path.read_text()
         for forbidden in ['subagent_type:', 'run_in_background:', 'cloud_base_branch', '~/.cursor/', 'AskQuestion', '/loop', 'update_state', 'SendToUser']:
-            assert forbidden not in text, f'{path}: unsupported {forbidden}'
-        assert not re.search(r'\b(?:claude-opus|grok)-\d', text), path
-        assert not re.search(r'^(?:<{7}|\|{7}|={7}|>{7})(?:\s|$)', text, re.M), path
+            if forbidden in text:
+                warnings.append(f'{path.relative_to(plugin)}: unsupported {forbidden}; runtime contract applies')
+        if re.search(r'\b(?:claude-opus|grok)-\d', text):
+            warnings.append(f'{path.relative_to(plugin)}: upstream model name; runtime contract applies')
+        if re.search(r'^(?:<{7}|\|{7}|={7}|>{7})(?:\s|$)', text, re.M):
+            warnings.append(f'{path.relative_to(plugin)}: upstream conflict-like text')
         for match in re.finditer(r'\[[^\]]*\]\(([^)]+)\)', text):
             target = match.group(1).split('#')[0]
             if not target or target == 'url' or re.match(r'\w+:', target) or '<' in target:
                 continue
             resolved = (path.parent / target).resolve()
-            assert resolved.is_relative_to(plugin.resolve()) and resolved.exists(), f'{path}: broken {target}'
+            if not resolved.is_relative_to(plugin.resolve()) or not resolved.exists():
+                warnings.append(f'{path.relative_to(plugin)}: broken {target}')
     for path in plugin.rglob('*'):
         assert not path.is_symlink(), path
         assert path.name not in ['node_modules', '__pycache__', '.git'], path
@@ -60,7 +67,11 @@ def validate(root):
 
 if __name__ == '__main__':
     try:
-        print(f'PASS: {validate(Path(__file__).resolve().parents[1])} skills, manifest, marketplace, links and Codex compatibility')
+        warnings = []
+        count = validate(Path(__file__).resolve().parents[1], warnings=warnings)
+        print(f'PASS: {count} skills, manifest, marketplace and package structure')
+        for warning in sorted(set(warnings)):
+            print(f'WARNING: {warning}')
     except (AssertionError, ValueError, KeyError, OSError, jsonschema.ValidationError, yaml.YAMLError) as error:
         print(f'Validation failed: {error}', file=sys.stderr)
         sys.exit(1)
