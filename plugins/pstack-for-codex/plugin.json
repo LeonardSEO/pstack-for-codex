@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "pstack-for-codex",
-  "version": "0.15.29",
+  "version": "0.15.30",
   "description": "Codex adaptation of pstack engineering principles, playbooks, reviews and verification workflows.",
   "author": {
     "name": "Leonard van Hemert"
