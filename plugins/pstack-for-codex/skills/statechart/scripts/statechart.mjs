@@ -5,13 +5,22 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { checkTlcOutput, findTlc, parseDot } from "./lib.mjs";
+import {
+  BROKEN_PROPERTY,
+  findTlc,
+  joinAnd,
+  parseDot,
+  PRIMES_OR_UNCHANGED,
+  tlaVariables,
+  tlcOutputWarning,
+  uncitedConditions,
+} from "./lib.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 const USAGE = {
   "from-spec":
-    "node statechart.mjs from-spec SPEC.tla [--fixed FIXED.tla | --against AGREED.tla] [--label TEXT] [--map FILE] [--expect-broken RULE]... [--title TEXT] [--out DIR] [--png]",
+    "node statechart.mjs from-spec SPEC.tla [--config FILE] [--fixed FIXED.tla [--fixed-config FILE] | --against AGREED.tla [--against-config FILE]] [--label TEXT] [--map FILE] [--expect-broken RULE]... [--title TEXT] [--out DIR] [--png]",
   "from-chart":
     "node statechart.mjs from-chart CHART.mmd [--module NAME] [--expect-broken RULE]... [--title TEXT] [--out DIR] [--png]",
 };
@@ -21,27 +30,48 @@ const FROM_SPEC = `from-spec SPEC.tla
   Checks each INVARIANT in SPEC.cfg in a separate TLC run. TLC stops at the first rule that a state
   breaks, and the separate runs find the rest. Each run also has the rule as a CONSTRAINT, so TLC
   stops each path at its first state that breaks the rule, and a rule that stays broken reports
-  only the step that broke it. SPEC.cfg sits next to the spec and has SPECIFICATION and one
-  INVARIANT line per rule. One more run dumps the state graph, and then the command draws the
-  charts. TLC names each step after the innermost named action that takes it, so give each kind of
-  step its own named action. The command warns when steps carry the name of the whole next-state
-  action.
+  only the step that broke it. SPEC.cfg has SPECIFICATION and one INVARIANT line per rule. Each
+  PROPERTY, a rule about whole behaviors, gets one TLC run too, and the charts do not draw it. A
+  rule listed as both INVARIANT and PROPERTY is checked once, as an INVARIANT. One
+  more run dumps the state graph, and then the command draws the charts. TLC names each step after
+  the innermost named action that takes it, so give each kind of step its own named action. The
+  command warns when steps carry the name of the whole next-state action. The command prints the
+  config that it checks each model with, and stops when a config does not exist, with the configs
+  beside the spec.
 
+  --config FILE      The config for SPEC.tla. Default: SPEC.cfg next to the spec.
   --fixed FIXED.tla  The model of the open fix. It is a copy of the spec with its own file and
                      module name, such as SpecFixed.tla with MODULE SpecFixed. The command checks
-                     it the same way, with FIXED.cfg, or with SPEC.cfg when there is no FIXED.cfg.
-                     The charts then mark each bad state fixed or still wrong.
+                     it the same way, with FIXED.cfg, or with the config of SPEC.tla when there is
+                     no FIXED.cfg. The charts then mark each bad state fixed or still wrong.
+  --fixed-config FILE
+                     The config for FIXED.tla.
   --against AGREED.tla
                      The spec that SPEC.tla must follow, when SPEC.tla models the code. It needs
-                     its own file and module name. The command checks it with AGREED.cfg, or with
-                     SPEC.cfg when there is no AGREED.cfg. SPEC.tla may add variables, record
-                     fields, and actions that AGREED.tla does not have. The comparison leaves them
-                     out. Do not use it with --fixed.
+                     its own file and module name. The command checks it with AGREED.cfg, and
+                     never with the config of SPEC.tla. SPEC.tla may add variables, record fields,
+                     and actions that AGREED.tla does not have. The comparison leaves them out.
+                     Do not use it with --fixed.
+  --against-config FILE
+                     The config for AGREED.tla, when it is not AGREED.cfg. Give the config that the
+                     spec's authors say the unchanged spec passes. A rule that this config does not
+                     check is "not checked" in the stories.
   --label TEXT       The name of the --fixed or --against model in the charts and the stories.
                      Default: "the fix", or "the spec".
   --map FILE         The labels for each model state and step. Default: SPEC.map.mjs next to the
-                     spec. When the file does not exist, the command writes one to fill in and
-                     exits 2. Its comments say what each function gets.`;
+                     spec. When the file does not exist, the command writes one from the spec's
+                     VARIABLES and actions to fill in, and exits 2 before it runs TLC. Its
+                     comments say what each function gets.
+
+  With --fixed or --against, SPEC.tla (and FIXED.tla) models the code, and the command finds each
+  condition of an action that no comment ties to code with a file and line, as in \\* pay.ts:120.
+  A condition is a conjunct of the action that changes nothing and reads a variable that the
+  action does not change. A rule can hold only because the model waits for a condition that the
+  code does not check, so the command prints these conditions when a rule holds.
+  With --against, each story says whether a config beside AGREED.tla expects TLC to break the
+  bug's rule. A config's "\\* expect: RULE" line says what TLC finds, and "\\* module: NAME" names
+  the module it checks when the folder has more than one .tla file. The command warns when no
+  config beside AGREED.tla has an expect line for that module.`;
 
 const FROM_CHART = `from-chart CHART.mmd
   Writes NAME.tla, NAME.cfg, and NAME.map.mjs next to the chart. When NAME.tla already exists, it
@@ -63,15 +93,16 @@ const FROM_CHART = `from-chart CHART.mmd
 
 const COMMON = `Both commands
   --expect-broken RULE
-                     A rule that is known to break. Repeat it, or list rules with commas, as in
-                     A,B. The command then exits 0 when exactly these rules break, and the --fixed
-                     or --against model breaks no other rule.
+                     An INVARIANT or PROPERTY that is known to break. Repeat it, or list rules
+                     with commas, as in A,B. The command then exits 0 when exactly these rules
+                     break, and the --fixed or --against model breaks no other rule.
   --title TEXT       The chart title. Each bug chart adds ", bug N".
   --out DIR          The output folder. Default: NAME-statechart next to the input. A run writes its
                      files in a temporary folder, and then replaces the whole output folder with
                      it. When runs overlap, the output folder has the files of the run that
                      finished last. The command does not use an output folder that has files that
-                     it did not write.
+                     it did not write. On a filesystem that cannot rename, the command copies the
+                     files into place, and overlapping runs can mix their files.
   --png              Also render each chart to PNG with npx @mermaid-js/mermaid-cli.
   -h, --help         Print this help, and exit 0.
 
@@ -87,7 +118,10 @@ Output
                      detail().
   stories.md         One entry per bug: the rule, why it breaks, the shortest path in reader
                      steps, and what the --fixed or --against model does instead.
-  summary.json       The counts behind the chart.
+  summary.json       The counts behind the chart. With --fixed or --against, uncited has the
+                     conditions with no file and line for each code model. With --against,
+                     second.listed has what each config beside AGREED.tla expects, and each bug
+                     has the configs that list it.
   tlc/               The config and the TLC output of each run. When the overview has regions,
                      from-spec also writes tlc/regions-all.mmd, the regions with every arrow, and
                      tlc/regions-proof.mmd, every state and step of TLC's graph in one region.
@@ -137,6 +171,13 @@ TLC
   TLA2TOOLS is the path to tla2tools.jar, and JAVA is the java binary (default: java, Java 11 or
   later). Download tla2tools.jar from https://github.com/tlaplus/tlaplus/releases. When TLA2TOOLS
   is not set, the command says where to get TLC and exits 2.
+  TLC checks each rule with one worker per CPU. When a rule is broken, TLC checks it again with one
+  worker, which finds the shortest bug paths, the same on every run. The command then prints how
+  many times TLC ran and how long that took.
+  TLC can find that a rule is broken and then fail with a Java exception while it reports the rule.
+  The command then keeps the paths that TLC printed, marks the rule broken, and warns that the
+  charts can miss states that break it. The failure is in TLC, so do not weaken the rule because of
+  it. A smaller constant can let TLC finish.
 
 Exit codes
   0  Every rule holds, or exactly the --expect-broken rules break. from-chart also draws CHART.mmd
@@ -150,7 +191,9 @@ Exit codes
      files it wrote and exits 2, whatever the rules give. Otherwise, exit 2 does not change the
      output folder, unless the command moved it aside and cannot put it back. Then the message
      names the folder's new path. When TLC stops on an error, the message names TLC's output, in a
-     temporary folder that the command keeps.`;
+     temporary folder that the command keeps. When the command cannot put its files in the output
+     folder, it keeps them in a temporary folder, and the message names it. The command checks
+     its input files again before --png renders, so a changed input stops the run before that.`;
 
 const HELP = {
   "": `${usage([...Object.values(USAGE), "node statechart.mjs [from-spec|from-chart] --help"])}
@@ -172,10 +215,22 @@ const more = (cmd) =>
 
 class CannotFinish extends Error {}
 class TlcStopped extends CannotFinish {}
+class NotPublished extends CannotFinish {}
 
 const COMMANDS = {
   "from-spec": {
-    flags: ["--map", "--fixed", "--against", "--label", "--expect-broken", "--title", "--out"],
+    flags: [
+      "--map",
+      "--config",
+      "--fixed",
+      "--fixed-config",
+      "--against",
+      "--against-config",
+      "--label",
+      "--expect-broken",
+      "--title",
+      "--out",
+    ],
     run: fromSpec,
   },
   "from-chart": { flags: ["--module", "--expect-broken", "--title", "--out"], run: fromChart },
@@ -203,7 +258,10 @@ function parseArgs([command, ...rest]) {
   return { command, input, flags };
 }
 
-const rel = (file) => path.relative(process.cwd(), file) || ".";
+const rel = (file) => {
+  const r = path.relative(process.cwd(), file) || ".";
+  return r === ".." || r.startsWith(`..${path.sep}`) ? path.resolve(file) : r;
+};
 const cfgOf = (spec) => spec.replace(/\.tla$/, ".cfg");
 
 function findTools() {
@@ -235,16 +293,28 @@ function splitRules(cfg) {
     .filter(Boolean);
   const kept = [];
   const rules = [];
+  const properties = [];
   let section = "";
   for (const w of words) {
     if (KEYWORD.test(w)) section = w;
-    if (!/^INVARIANTS?$/.test(section)) kept.push(KEYWORD.test(w) && kept.length ? `\n${w}` : w);
-    else if (w !== section && !rules.includes(w)) rules.push(w);
+    const list = /^INVARIANTS?$/.test(section)
+      ? rules
+      : /^PROPERT(Y|IES)$/.test(section)
+        ? properties
+        : null;
+    if (!list) kept.push(KEYWORD.test(w) && kept.length ? `\n${w}` : w);
+    else if (w !== section && !list.includes(w)) list.push(w);
   }
-  return { cfgWithoutRules: `${kept.join(" ")}\n`, rules };
+  // TLC takes only a state predicate as an INVARIANT, and checks a state predicate given as a
+  // PROPERTY only in the initial states, which the INVARIANT run checks too.
+  return {
+    cfgWithoutRules: `${kept.join(" ")}\n`,
+    rules,
+    properties: properties.filter((p) => !rules.includes(p)),
+  };
 }
 
-function tlc(tools, spec, cfg, base, dump) {
+function tlc(tools, spec, cfg, base, { dump, workers = "1" } = {}) {
   fs.writeFileSync(`${base}.cfg`, cfg);
   const metadir = fs.mkdtempSync(path.join(os.tmpdir(), "tlc-"));
   // TLC writes the standard modules, such as Naturals.tla, to java.io.tmpdir under fixed names,
@@ -255,10 +325,13 @@ function tlc(tools, spec, cfg, base, dump) {
   const r = spawnSync(
     tools.java,
     [
+      "-XX:+UseParallelGC",
       `-Djava.io.tmpdir=${javaTmp}`,
       "-cp",
       tools.jar,
       "tlc2.TLC",
+      "-workers",
+      workers,
       "-metadir",
       metadir,
       "-deadlock",
@@ -274,18 +347,20 @@ function tlc(tools, spec, cfg, base, dump) {
   if (r.error) throw new CannotFinish(`cannot run TLC: ${r.error.message}`);
   fs.writeFileSync(`${base}.out`, r.stdout);
   try {
-    checkTlcOutput(r.stdout, `${base}.out`);
+    return { stdout: r.stdout, warning: tlcOutputWarning(r.stdout, `${base}.out`) };
   } catch (e) {
     throw new TlcStopped(e.message);
   }
-  return r.stdout;
 }
 
-function warnUnnamedSteps(spec, cfg, dot) {
-  const text = fs
+const withoutComments = (spec) =>
+  fs
     .readFileSync(spec, "utf8")
     .replace(/\(\*[^]*?\*\)/g, " ")
     .replace(/\\\*.*/g, " ");
+
+function warnUnnamedSteps(spec, cfg, dot) {
+  const text = withoutComments(spec);
   const specName = /^SPECIFICATION\s+(\w+)/m.exec(cfg)?.[1];
   const specBody = specName && new RegExp(`^${specName}\\s*==(.*(\\n[ \\t]+.*)*)`, "m").exec(text);
   const next =
@@ -298,50 +373,87 @@ function warnUnnamedSteps(spec, cfg, dot) {
     );
 }
 
-function readModel(spec, cfgFile) {
+function readModel(spec, cfgFile, flag) {
   if (!fs.existsSync(spec)) throw new CannotFinish(`${rel(spec)} does not exist`);
-  if (!fs.existsSync(cfgFile))
+  if (!fs.existsSync(cfgFile)) {
+    const beside = fs
+      .readdirSync(path.dirname(spec))
+      .filter((f) => f.endsWith(".cfg"))
+      .sort();
     throw new CannotFinish(
-      `${rel(cfgFile)} does not exist. It needs SPECIFICATION and one INVARIANT line per rule.`,
+      `${rel(cfgFile)} does not exist. Pass ${flag} with the config to check ${path.basename(spec)} with. ${
+        beside.length
+          ? `The configs beside it: ${beside.join(", ")}.`
+          : "A config has SPECIFICATION and one INVARIANT line per rule."
+      }`,
     );
+  }
   return { spec, cfgFile, ...splitRules(fs.readFileSync(cfgFile, "utf8")) };
 }
 
-function readInput(spec, expected) {
-  const model = readModel(spec, cfgOf(spec));
-  const unknown = [...expected].filter((r) => !model.rules.includes(r));
+function readInput(spec, cfgFile, expected) {
+  const model = readModel(spec, cfgFile, "--config");
+  const names = [...model.rules, ...model.properties];
+  const unknown = [...expected].filter((r) => !names.includes(r));
   if (unknown.length)
     throw new CannotFinish(
-      `--expect-broken ${unknown.join(", ")}: not a rule in ${rel(model.cfgFile)}, whose rules are ${model.rules.join(", ") || "none"}.`,
+      `--expect-broken ${unknown.join(", ")}: not a rule in ${rel(model.cfgFile)}, whose rules are ${names.join(", ") || "none"}.`,
     );
   return model;
 }
 
-function check(tools, { spec, cfgFile, cfgWithoutRules, rules }, work, expected) {
+function check(tools, model, { work, out }, expected) {
+  const { spec, cfgFile, cfgWithoutRules, rules, properties } = model;
+  const started = Date.now();
+  let runs = 0;
+  const run = (cfg, file, options) => {
+    runs++;
+    return tlc(tools, spec, cfg, file, options);
+  };
   const name = path.basename(spec, ".tla");
   const tlcDir = path.join(work, "tlc");
   const dot = path.join(tlcDir, `${name}.dot`);
-  tlc(tools, spec, cfgWithoutRules, path.join(tlcDir, name), dot);
+  // One worker writes the graph in a fixed order, which breaks ties between equally short paths.
+  run(cfgWithoutRules, path.join(tlcDir, name), { dump: dot });
   warnUnnamedSteps(spec, cfgWithoutRules, dot);
-  console.log(`TLC on ${path.basename(spec)}:`);
+  console.log(`TLC on ${path.basename(spec)} with ${rel(cfgFile)}:`);
   if (rules.length === 0)
-    console.log(`  ${path.basename(cfgFile)} has no INVARIANT, so no rule is checked.`);
-  // With -continue TLC reports every bad state. The CONSTRAINT stops each path at its first bad
-  // state, so a rule that stays broken reports only the step that broke it, not every later state.
+    console.log(
+      `  ${path.basename(cfgFile)} has no INVARIANT, so ${properties.length ? "the chart marks no state broken" : "no rule is checked"}.`,
+    );
+  const said = (rule, broken) =>
+    `  ${rule} ${broken ? (expected.has(rule) ? "is broken (expected)" : "is broken") : "holds"}.`;
+  const shown = (file) => rel(path.join(out, "tlc", path.basename(file)));
   const traces = rules.map((rule) => {
     const file = path.join(tlcDir, `${name}-${rule}`);
     const cfg = `${cfgWithoutRules}INVARIANT ${rule}\nCONSTRAINT ${rule}\n`;
-    const broken = /^Error: Invariant /m.test(tlc(tools, spec, cfg, file));
-    console.log(
-      `  ${rule} ${broken ? (expected.has(rule) ? "is broken (expected)" : "is broken") : "holds"}.`,
-    );
+    let result = run(cfg, file, { workers: "auto" });
+    // Several workers can reach a bad state by a longer path first. One worker searches breadth
+    // first in a fixed order, so the chart's bug paths are the shortest, and the same every run.
+    if (/^Error: Invariant /m.test(result.stdout)) result = run(cfg, file);
+    const broken = /^Error: Invariant /m.test(result.stdout);
+    console.log(said(rule, broken));
+    if (result.warning) console.error(`${shown(`${file}.out`)}: ${result.warning}`);
     return { file: `${file}.out`, rule, broken };
   });
-  return { spec, dot, traces, broken: traces.some((t) => t.broken) };
+  const temporal = properties.map((property) => {
+    const file = path.join(tlcDir, `${name}-${property}`);
+    const { stdout } = run(`${cfgWithoutRules}PROPERTY ${property}\n`, file, { workers: "auto" });
+    const broken = BROKEN_PROPERTY.test(stdout);
+    console.log(
+      `${said(property, broken)}${broken ? ` The chart draws only INVARIANT rules, so read TLC's counterexample in ${shown(`${file}.out`)}.` : ""}`,
+    );
+    return { file: `${file}.out`, rule: property, broken };
+  });
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+  console.log(`  TLC ran ${runs} ${runs === 1 ? "time" : "times"} in ${seconds} s.`);
+  const broken = [...traces, ...temporal].some((t) => t.broken);
+  return { spec, dot, traces, properties: temporal, broken };
 }
 
 function rulesAsExpected(now, other, expected) {
-  const brokenIn = (m) => (m?.traces ?? []).filter((t) => t.broken).map((t) => t.rule);
+  const brokenIn = (m) =>
+    [...(m?.traces ?? []), ...(m?.properties ?? [])].filter((t) => t.broken).map((t) => t.rule);
   if (expected.size === 0) return !now.broken && !other?.broken;
   const unexpected = [...new Set([...brokenIn(now), ...brokenIn(other)])].filter(
     (r) => !expected.has(r),
@@ -354,9 +466,19 @@ function rulesAsExpected(now, other, expected) {
   return !unexpected.length && !holds.length;
 }
 
-const SCAFFOLD = (name, graph) => {
-  const vars = Object.keys([...graph.nodes.values()][0]?.vars ?? {});
-  const actions = [...new Set([...graph.edges, ...graph.loops].map((e) => e.action))].sort();
+const SCAFFOLD = (name, spec) => {
+  const text = withoutComments(spec);
+  const vars = tlaVariables(text);
+  // A definition that only another action calls is listed too, though TLC names no step after it.
+  const actions = [
+    ...new Set(
+      text
+        .split(/\n(?=\S)/)
+        .map((d) => /^(\w+)\s*(?:\([^)]*\))?\s*==([^]*)/.exec(d))
+        .filter((d) => d && PRIMES_OR_UNCHANGED.test(d[2]))
+        .map((d) => d[1]),
+    ),
+  ].sort();
   return `// Chart labels for ${name}, for statechart.mjs. Write labels in plain words, not variable or action names.
 // v, before, and after map each variable to its value. Strings, numbers, and booleans keep their kind.
 // Sequences, tuples, and sets become arrays, indexed from 0. Records and functions become objects.
@@ -416,7 +538,7 @@ export function step(action, before, after) {
 `;
 };
 
-async function draw({ now, other, map, work, out, title, comparing }) {
+async function draw({ now, other, uncited, map, work, out, title, comparing }) {
   const shown = published(work, out);
   const mapping = await import(pathToFileURL(path.resolve(map)).href);
   const from = ["--dot", now.dot, "--map", map, "--spec", now.spec];
@@ -424,7 +546,10 @@ async function draw({ now, other, map, work, out, title, comparing }) {
   if (other) {
     from.push(`--${other.role}-dot`, other.dot, "--spec", other.spec);
     from.push(...other.traces.flatMap((t) => [`--${other.role}-traces`, t.file]));
+    if (other.traces.length)
+      from.push(`--${other.role}-rules`, other.traces.map((t) => t.rule).join(","));
     if (other.label !== undefined) from.push("--label", other.label);
+    if (other.listed) from.push("--listed", JSON.stringify(other.listed));
   }
   if (comparing) from.push("--full-labels", "--flat");
   else if (mapping.readerActions?.length) from.push("--cover");
@@ -455,6 +580,8 @@ async function draw({ now, other, map, work, out, title, comparing }) {
     map,
   );
   const summary = JSON.parse(fs.readFileSync(files.summary, "utf8"));
+  if (uncited)
+    fs.writeFileSync(files.summary, `${JSON.stringify({ ...summary, uncited }, null, 2)}\n`);
   const charts = [files.overview];
   for (const c of summary.classes) {
     const views = typeof mapping.detail === "function" ? ["", "-developer", "-layered"] : [""];
@@ -496,7 +623,7 @@ async function draw({ now, other, map, work, out, title, comparing }) {
   console.log(
     summary.classes.length
       ? fs.readFileSync(files.stories, "utf8").trimEnd()
-      : "No rule is broken.",
+      : "No state breaks a rule.",
   );
   return { files, charts };
 }
@@ -522,6 +649,7 @@ function render(charts, shown) {
 }
 
 function finish({ work, out, inputs }, { files, charts }, ok, png) {
+  unchanged(inputs, out);
   const pngs = png ? render(charts, published(work, out)) : [];
   publish(work, out, inputs);
   const written = [...charts, ...pngs, files.stories, files.summary]
@@ -584,7 +712,9 @@ async function inWorkFolder(body) {
   try {
     return await body(work);
   } catch (e) {
-    keep = e instanceof TlcStopped;
+    keep = e instanceof TlcStopped || e instanceof NotPublished;
+    if (e instanceof NotPublished)
+      e.message += ` The files that this run wrote are in ${rel(work)}.`;
     throw e;
   } finally {
     if (!keep) fs.rmSync(work, { recursive: true, force: true });
@@ -597,9 +727,32 @@ const moved = (from, to, ...missed) => {
     return true;
   } catch (e) {
     if (missed.includes(e.code)) return false;
+    if (!["ENOSYS", "EXDEV", "EISDIR"].includes(e.code)) throw e;
+  }
+  // Some filesystems, such as FUSE mounts, cannot rename a folder that has files. They fail with
+  // ENOSYS, or with EISDIR when the target exists.
+  if (!fs.existsSync(from) && missed.includes("ENOENT")) return false;
+  if (fs.existsSync(to)) {
+    if (fs.readdirSync(to).length && missed.includes("ENOTEMPTY")) return false;
+    fs.rmdirSync(to);
+  }
+  try {
+    fs.cpSync(from, to, { recursive: true, errorOnExist: true, force: false });
+  } catch (e) {
+    fs.rmSync(to, { recursive: true, force: true });
     throw e;
   }
+  fs.rmSync(from, { recursive: true, force: true });
+  return true;
 };
+
+function unchanged(inputs, out) {
+  const changed = [...inputs].find(([f, was]) => fingerprint(f) !== was)?.[0];
+  if (changed)
+    throw new NotPublished(
+      `${rel(changed)} changed while this run read it, so the run left ${rel(out)} as it was. Run the command again.`,
+    );
+}
 
 function publish(work, out, inputs) {
   const parent = path.dirname(path.resolve(out));
@@ -609,11 +762,7 @@ function publish(work, out, inputs) {
   let aside = false;
   try {
     fs.cpSync(work, next, { recursive: true });
-    const changed = [...inputs].find(([f, was]) => fingerprint(f) !== was)?.[0];
-    if (changed)
-      throw new CannotFinish(
-        `${rel(changed)} changed while this run read it, so the run left ${rel(out)} as it was. Run the command again.`,
-      );
+    unchanged(inputs, out);
     refuseForeign(out);
     while (!moved(next, out, "ENOTEMPTY", "EEXIST")) {
       if (aside) {
@@ -629,12 +778,12 @@ function publish(work, out, inputs) {
     fs.rmSync(next, { recursive: true, force: true });
     const why = e instanceof CannotFinish ? e.message : `cannot replace ${rel(out)}: ${e.message}.`;
     if (!back)
-      throw new CannotFinish(
+      throw new NotPublished(
         `${why} This run moved the previous ${rel(out)} to ${rel(old)} and could not put it back.`,
       );
-    throw e instanceof CannotFinish
-      ? e
-      : new CannotFinish(`${why} The run left ${rel(out)} as it was.`);
+    throw new NotPublished(
+      e instanceof CannotFinish ? why : `${why} The run left ${rel(out)} as it was.`,
+    );
   }
   if (aside) fs.rmSync(old, { recursive: true, force: true });
 }
@@ -647,7 +796,17 @@ function putBack(old, out) {
   }
 }
 
-function secondModel(input, { fixed, against, label }) {
+function secondCfg(cfg, flags) {
+  if (flags["fixed-config"] && !flags.fixed)
+    throw new CannotFinish(`--fixed-config needs --fixed. ${more("from-spec")}`);
+  if (flags["against-config"] && !flags.against)
+    throw new CannotFinish(`--against-config needs --against. ${more("from-spec")}`);
+  if (flags.fixed)
+    return flags["fixed-config"] ?? (fs.existsSync(cfgOf(flags.fixed)) ? cfgOf(flags.fixed) : cfg);
+  return flags.against && (flags["against-config"] ?? cfgOf(flags.against));
+}
+
+function secondModel(input, cfg, { fixed, against, label }) {
   if (fixed && against)
     throw new CannotFinish(`use --fixed or --against, not both. ${more("from-spec")}`);
   if (!fixed && !against) {
@@ -658,38 +817,91 @@ function secondModel(input, { fixed, against, label }) {
   }
   const [role, spec] = fixed ? ["fixed", fixed] : ["against", against];
   const name = path.basename(input, ".tla");
-  // TLC's output files are named after the spec, so a second model with the same name overwrites them.
   if (path.basename(spec, ".tla") === name)
     throw new CannotFinish(
       `${rel(spec)} needs its own file and module name, such as ${name}${fixed ? "Fixed" : "Agreed"}.tla.`,
     );
-  const cfg = fs.existsSync(cfgOf(spec)) ? cfgOf(spec) : cfgOf(input);
-  return { role, label, model: readModel(spec, cfg) };
+  return { role, label, model: readModel(spec, cfg, `--${role}-config`) };
+}
+
+function warnUnchecked(now, other) {
+  const unchecked = now.rules.filter((r) => !other.rules.includes(r));
+  if (unchecked.length)
+    console.error(
+      `${rel(other.cfgFile)} does not check ${unchecked.join(", ")}, so the stories cannot say whether ${path.basename(other.spec)} keeps ${unchecked.length === 1 ? "it" : "them"}.`,
+    );
+}
+
+function listedBreaks(spec) {
+  const dir = path.dirname(spec);
+  const files = fs.readdirSync(dir).sort();
+  const modules = files.filter((f) => f.endsWith(".tla") && !f.includes("_TTrace_"));
+  const only = modules.length === 1 ? path.basename(modules[0], ".tla") : undefined;
+  const breaks = {};
+  let headed = false;
+  for (const f of files.filter((f) => f.endsWith(".cfg"))) {
+    const cfg = fs.readFileSync(path.join(dir, f), "utf8");
+    const module = /^\\\* module:[ \t]*(\w+)[ \t]*$/m.exec(cfg)?.[1] ?? only;
+    const expect = /^\\\* expect:[ \t]*(\w+)[ \t]*$/m.exec(cfg)?.[1];
+    if (module !== path.basename(spec, ".tla") || !expect) continue;
+    headed = true;
+    if (!/^(pass|deadlock)$|^error/.test(expect)) breaks[f] = expect;
+  }
+  return headed ? { spec: path.basename(spec), breaks } : null;
+}
+
+function warnUnlisted(now, other) {
+  if (other.listed || !now.traces.some((t) => t.broken)) return;
+  const module = path.basename(other.spec, ".tla");
+  console.error(
+    `No config beside ${rel(other.spec)} has an "\\* expect:" line for ${module}, so the stories cannot say whether ${module} already lists each bug. When ${path.basename(other.spec)} is a copy, pass the spec in its own folder.`,
+  );
+}
+
+function warnUncited(models) {
+  return Object.fromEntries(
+    models.map(({ spec, traces, properties }) => {
+      const found = uncitedConditions(fs.readFileSync(spec, "utf8"));
+      const held = [...traces, ...properties].filter((t) => !t.broken).map((t) => t.rule);
+      const short = (s) => (s.length > 90 ? `${s.slice(0, 87)}...` : s);
+      if (found.length && held.length)
+        console.error(
+          `${rel(spec)}: ${joinAnd(held)} ${held.length === 1 ? "holds" : "hold"}, but a rule can also hold because the model waits for a condition that the code does not check. No comment gives the file and line of the code that checks ${found.length === 1 ? "this condition" : "these conditions"}:\n${found.map((c) => `  ${rel(spec)}:${c.line} ${c.action}: ${short(c.condition)}`).join("\n")}\nPut that file and line in a comment on each condition, as in \\* pay.ts:120, or remove the condition when no code checks it.`,
+        );
+      return [path.basename(spec), found];
+    }),
+  );
 }
 
 async function fromSpec(input, { "expect-broken": expected, ...flags }) {
   const name = path.basename(input, ".tla");
   const map = flags.map ?? path.join(path.dirname(input), `${name}.map.mjs`);
-  const secondSpec = flags.fixed ?? flags.against;
-  const inputs = snapshot([input, cfgOf(input), map, secondSpec, secondSpec && cfgOf(secondSpec)]);
-  const second = secondModel(input, flags);
-  const tools = findTools();
-  const model = readInput(input, expected);
+  const cfg = flags.config ?? cfgOf(input);
+  const otherCfg = secondCfg(cfg, flags);
+  const inputs = snapshot([input, cfg, map, flags.fixed ?? flags.against, otherCfg]);
+  const second = secondModel(input, otherCfg, flags);
+  const model = readInput(input, cfg, expected);
   const out = outDir(flags.out, input, name);
+  if (!fs.existsSync(map)) {
+    fs.writeFileSync(map, SCAFFOLD(name, input));
+    throw new CannotFinish(`Wrote ${rel(map)}. Fill in its labels, then run this command again.`);
+  }
+  const tools = findTools();
   return inWorkFolder(async (work) => {
-    const now = check(tools, model, work, expected);
-    if (!fs.existsSync(map)) {
-      fs.writeFileSync(map, SCAFFOLD(name, parseDot(fs.readFileSync(now.dot, "utf8"))));
-      throw new CannotFinish(
-        `\nWrote ${rel(map)}. Fill in its labels, then run this command again.`,
-      );
-    }
+    const now = check(tools, model, { work, out }, expected);
     const other = second && {
       role: second.role,
       label: second.label,
-      ...check(tools, second.model, work, expected),
+      listed: second.role === "against" ? listedBreaks(second.model.spec) : undefined,
+      ...check(tools, second.model, { work, out }, expected),
     };
-    const drawn = await draw({ now, other, map, work, out, title: flags.title });
+    let uncited;
+    if (second) {
+      warnUnchecked(model, second.model);
+      if (second.role === "against") warnUnlisted(now, other);
+      uncited = warnUncited(second.role === "fixed" ? [now, other] : [now]);
+    }
+    const drawn = await draw({ now, other, uncited, map, work, out, title: flags.title });
     return finish({ work, out, inputs }, drawn, rulesAsExpected(now, other, expected), flags.png);
   });
 }
@@ -713,10 +925,10 @@ async function fromChart(input, { "expect-broken": expected, ...flags }) {
   }
   snapshot([spec, cfgOf(spec), map], inputs);
   const tools = findTools();
-  const model = readInput(spec, expected);
+  const model = readInput(spec, cfgOf(spec), expected);
   const out = outDir(flags.out, input, name);
   return inWorkFolder(async (work) => {
-    const now = check(tools, model, work, expected);
+    const now = check(tools, model, { work, out }, expected);
     const drawn = await draw({ now, map, work, out, title: flags.title, comparing: true });
     const compared = script("compare-charts.mjs", [input, drawn.files.overview], input, {
       okExits: [0, 1],

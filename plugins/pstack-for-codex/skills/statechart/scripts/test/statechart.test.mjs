@@ -15,7 +15,6 @@ import { test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import {
-  checkTlcOutput,
   findTlc,
   parseDot,
   parseMermaid,
@@ -23,19 +22,24 @@ import {
   parseValue,
   ruleSentences,
   stateKey,
+  tlcOutputWarning,
+  uncitedConditions,
 } from "../lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scripts = dirname(here);
 const fixture = (name) => readFileSync(join(here, name), "utf8");
 const edges = (r) => r.transitions.map((t) => `${t.from} -> ${t.to} : ${t.label}`).sort();
-const node = (script, args, cwd, env = {}) =>
-  spawnSync(process.execPath, [join(scripts, script), ...args], {
+const node = (script, args, cwd, env = {}) => {
+  const r = spawnSync(process.execPath, [join(scripts, script), ...args], {
     cwd,
     encoding: "utf8",
     env: { ...process.env, ...env },
     timeout: 120_000,
   });
+  r.stdout = r.stdout?.replace(/^( {2}TLC ran \d+ times? in )\d+\.\d s\.$/gm, "$1N s.");
+  return r;
+};
 
 test("a transition on a composite leaves from every state inside it", () => {
   const { regions } = parseMermaid(fixture("upload.mmd"));
@@ -107,6 +111,38 @@ Bare == TRUE
     [["NoFalseSaved", 'You never see "Saved" while the note is a draft.']],
   );
   assert.equal(stateKey({ b: 1, a: { d: 2, c: [3] } }), stateKey({ a: { c: [3], d: 2 }, b: 1 }));
+});
+
+test("an action's condition on a variable that the action does not change needs a file and line", () => {
+  const found = uncitedConditions(`---- MODULE Pay ----
+CONSTANT MaxAge
+VARIABLES screen, sent,
+          paid, clock
+Ready == sent > 0
+Tick == clock' = clock + 1 /\\ UNCHANGED <<screen, sent, paid>>
+Pay ==
+  /\\ screen = "Cart \\* not a comment"
+  /\\ MaxAge > 0
+  /\\ clock < MaxAge (* pay.ts:120 *)
+  /\\ Ready
+  \\* checkout.ts:88
+  /\\ sent < 3
+  /\\ screen' = IF clock > 0 /\\ sent > 0 THEN "Paid" ELSE screen /\\ paid' = TRUE
+  /\\ UNCHANGED <<sent, clock>>
+\\* fill.ts:10
+Fill == \\E o \\in 1..3 : /\\ paid = TRUE
+                        /\\ clock > 0 /\\ sent' = o + 1
+                        /\\ sent = o
+                        /\\ paid => clock > 0 /\\ screen = "Cart"
+                        /\\ UNCHANGED <<screen, paid, clock>>
+Next == Tick \\/ Pay \\/ Fill
+====`);
+  assert.deepEqual(found, [
+    { line: 11, action: "Pay", condition: "Ready" },
+    { line: 17, action: "Fill", condition: "paid = TRUE" },
+    { line: 18, action: "Fill", condition: "clock > 0" },
+    { line: 20, action: "Fill", condition: 'paid => clock > 0 /\\ screen = "Cart"' },
+  ]);
 });
 
 test("the legend is not part of the machine", () => {
@@ -244,7 +280,7 @@ test("a rule broken by a start state is a counterexample of one state", () => {
 /\\ conn = "Offline"
 
 ${done}`;
-  assert.doesNotThrow(() => checkTlcOutput(text, "tlc.out"));
+  assert.doesNotThrow(() => tlcOutputWarning(text, "tlc.out"));
   assert.deepEqual(parseTraces(text), [
     {
       invariant: "NeverSyncedWhileOffline",
@@ -255,30 +291,30 @@ ${done}`;
 
 test("TLC output from a run that failed or stopped early is refused", () => {
   assert.doesNotThrow(() =>
-    checkTlcOutput(
+    tlcOutputWarning(
       `Error: Invariant Small is violated.\nError: The behavior up to this point is:\nState 1: <Initial predicate>\nx = 0\n\n${done}`,
       "ok.out",
     ),
   );
   assert.throws(
     () =>
-      checkTlcOutput(
+      tlcOutputWarning(
         "Error: The invariant Nope specified in the configuration file\nis not defined in the specification.\n",
         "cfg.out",
       ),
     /cfg\.out: TLC stopped on an error that is not a broken rule/,
   );
   assert.throws(
-    () => checkTlcOutput("Error: Parsing or semantic analysis failed.\n", "parse.out"),
+    () => tlcOutputWarning("Error: Parsing or semantic analysis failed.\n", "parse.out"),
     /not a broken rule/,
   );
   assert.throws(
-    () => checkTlcOutput(evaluationError, "eval.out"),
+    () => tlcOutputWarning(evaluationError, "eval.out"),
     /TLC threw an unexpected exception/,
   );
   assert.throws(
     () =>
-      checkTlcOutput(
+      tlcOutputWarning(
         "Error: Invariant Small is violated.\nError: The behavior up to this point is:\nState 1: <Initial predicate>\nx = 0\n",
         "stopped.out",
       ),
@@ -287,6 +323,58 @@ test("TLC output from a run that failed or stopped early is refused", () => {
   assert.deepEqual(
     parseTraces(evaluationError).map((t) => t.invariant),
     ["NoLost", null],
+  );
+});
+
+const tlcThrew = (cls, message) => `Error: Evaluating invariant Small failed.
+Index 123 out of bounds for length 4
+Error: TLC threw an unexpected exception.
+This was probably caused by an error in the spec or model.
+See the User Output or TLC Console for clues to what happened.
+The exception was a ${cls}
+: ${message}
+Error: The error occurred when TLC was evaluating the nested
+expressions at the following positions:
+    The error call stack is empty.
+`;
+const smallBroken =
+  "Error: Invariant Small is violated.\nError: The behavior up to this point is:\nState 1: <Initial predicate>\nx = 0\n\n";
+const stoppedEarly = "9 states generated, 9 distinct states found, 4 states left on queue.\n";
+
+test("a rule that TLC finds broken before TLC throws a Java exception keeps its paths, with a warning", () => {
+  const aioobe = "java.lang.ArrayIndexOutOfBoundsException: Index 123 out of bounds for length 4";
+  const oneWorker = `${smallBroken}Error: Invariant Small is violated.\n${tlcThrew(
+    "java.lang.ArrayIndexOutOfBoundsException",
+    "Index 123 out of bounds for length 4",
+  )}\n${stoppedEarly}`;
+  assert.equal(
+    tlcOutputWarning(oneWorker, "tlc.out"),
+    `TLC found that Small is broken, and then failed with ${aioobe}. TLC stopped before it checked every state, so the charts can miss states that break Small. The failure is in TLC, not in the rule. Do not weaken Small because of it. A smaller constant can let TLC finish.`,
+  );
+  const workersInterleaved = `${tlcThrew("java.lang.RuntimeException", aioobe)}${smallBroken}${stoppedEarly}`;
+  assert.match(
+    tlcOutputWarning(workersInterleaved, "tlc.out"),
+    /failed with java\.lang\.ArrayIndexOutOfBoundsException: Index 123/,
+  );
+  assert.deepEqual(
+    parseTraces(workersInterleaved).map((t) => t.invariant),
+    ["Small"],
+  );
+  assert.throws(
+    () =>
+      tlcOutputWarning(
+        `${smallBroken}${tlcThrew("java.lang.RuntimeException", "util.Assert$TLCRuntimeException: Attempted to apply tuple")}${stoppedEarly}`,
+        "formula.out",
+      ),
+    /formula\.out: TLC stopped on an error that is not a broken rule: Evaluating invariant Small failed\./,
+  );
+  assert.throws(
+    () =>
+      tlcOutputWarning(
+        `${tlcThrew("java.lang.ArrayIndexOutOfBoundsException", "Index 123 out of bounds for length 4")}${stoppedEarly}`,
+        "never-broken.out",
+      ),
+    /not a broken rule: Evaluating invariant Small failed\./,
   );
 });
 
@@ -713,7 +801,7 @@ const NO_TLC = `Cannot find TLC. Download tla2tools.jar from a TLA+ release:
 Then set TLA2TOOLS to the path of tla2tools.jar, and JAVA to a java binary (Java 11 or later).
 `;
 const FROM_SPEC_USAGE =
-  "node statechart.mjs from-spec SPEC.tla [--fixed FIXED.tla | --against AGREED.tla] [--label TEXT] [--map FILE] [--expect-broken RULE]... [--title TEXT] [--out DIR] [--png]";
+  "node statechart.mjs from-spec SPEC.tla [--config FILE] [--fixed FIXED.tla [--fixed-config FILE] | --against AGREED.tla [--against-config FILE]] [--label TEXT] [--map FILE] [--expect-broken RULE]... [--title TEXT] [--out DIR] [--png]";
 const FROM_CHART_USAGE =
   "node statechart.mjs from-chart CHART.mmd [--module NAME] [--expect-broken RULE]... [--title TEXT] [--out DIR] [--png]";
 const noTlc = { TLA2TOOLS: "", JAVA: "" };
@@ -989,13 +1077,14 @@ test("from-chart checks the agreed chart and draws it back unchanged", needsTlc,
   assert.equal(
     r.stdout,
     `Wrote Upload.tla, Upload.cfg, and Upload.map.mjs from upload.mmd.
-TLC on Upload.tla:
+TLC on Upload.tla with Upload.cfg:
   TypeOK holds.
+  TLC ran 2 times in N s.
 
 Chart: 5 states and 8 transitions from 5 model states.
 5 work, 0 break a rule.
 
-No rule is broken.
+No state breaks a rule.
 
 The spec draws upload.mmd back unchanged.
 
@@ -1031,9 +1120,10 @@ test("from-chart finds the design bug, and from-spec with the fix marks it fixed
   assert.equal(
     today.stdout,
     `Wrote Sync.tla, Sync.cfg, and Sync.map.mjs from sync.mmd.
-TLC on Sync.tla:
+TLC on Sync.tla with Sync.cfg:
   TypeOK holds.
   NeverSyncedWhileOffline is broken.
+  TLC ran 4 times in N s.
 
 Chart: 4 states and 8 transitions from 4 model states.
 3 work, 1 breaks a rule.
@@ -1059,12 +1149,14 @@ Wrote chart.mmd, bug-1.mmd, stories.md, summary.json in Sync-statechart.
   assert.equal(fixed.status, 1, fixed.stderr);
   assert.equal(
     fixed.stdout,
-    `TLC on Sync.tla:
+    `TLC on Sync.tla with Sync.cfg:
   TypeOK holds.
   NeverSyncedWhileOffline is broken.
-TLC on SyncFixed.tla:
+  TLC ran 4 times in N s.
+TLC on SyncFixed.tla with Sync.cfg:
   TypeOK holds.
   NeverSyncedWhileOffline holds.
+  TLC ran 3 times in N s.
 
 Chart: 4 states and 9 transitions from 4 model states.
 3 work today, 0 still wrong with the fix, 1 fixed or new with the fix.
@@ -1113,14 +1205,15 @@ Wrote chart.mmd, bug-1.mmd, stories.md, summary.json in Sync-statechart.
   assert.equal(
     coded.stdout,
     `Kept Sync.tla. Delete it to write the spec again from sync.mmd.
-TLC on Sync.tla:
+TLC on Sync.tla with Sync.cfg:
   TypeOK holds.
   NeverSyncedWhileOffline holds.
+  TLC ran 3 times in N s.
 
 Chart: 3 states and 5 transitions from 3 model states.
 3 work, 0 break a rule.
 
-No rule is broken.
+No state breaks a rule.
 
 The spec does not draw sync.mmd:
   states only in EXPECTED (no path from the start reaches them in the spec, or the spec renamed them):
@@ -1217,6 +1310,126 @@ export const cause = () => "each charge request charges again";
 `;
 
 test(
+  "from-spec checks each PROPERTY in its own TLC run, and names the counterexample of a broken one",
+  needsTlc,
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "statechart-"));
+    writeFileSync(
+      join(dir, "Pay.tla"),
+      pay("Pay", `screen = "Paying" /\\ charges = 0 /\\ charges' = 1 /\\ UNCHANGED screen`).replace(
+        "====",
+        'ChargedAtMostOnce == [](charges <= 1)\nEventuallyPaying == <>(screen = "Paying")\n====',
+      ),
+    );
+    writeFileSync(
+      join(dir, "Pay.cfg"),
+      "SPECIFICATION Spec\nINVARIANT NoDoubleCharge\nPROPERTIES ChargedAtMostOnce EventuallyPaying\n",
+    );
+    writeFileSync(join(dir, "Pay.map.mjs"), payMap);
+    const r = node("statechart.mjs", ["from-spec", "Pay.tla"], dir);
+    assert.equal(r.status, 1, r.stderr);
+    assert.equal(
+      r.stdout.split("\n\n")[0],
+      `TLC on Pay.tla with Pay.cfg:
+  NoDoubleCharge holds.
+  ChargedAtMostOnce holds.
+  EventuallyPaying is broken. The chart draws only INVARIANT rules, so read TLC's counterexample in ${join("Pay-statechart", "tlc", "Pay-EventuallyPaying.out")}.
+  TLC ran 4 times in N s.`,
+    );
+    assert.match(r.stdout, /\nNo state breaks a rule\.\n/);
+    const tlcDir = join(dir, "Pay-statechart", "tlc");
+    assert.match(
+      readFileSync(join(tlcDir, "Pay-EventuallyPaying.out"), "utf8"),
+      /^Error: Temporal properties were violated\./m,
+    );
+    assert.deepEqual(
+      readdirSync(tlcDir)
+        .filter((f) => f.endsWith(".cfg") && /PROPERT/.test(readFileSync(join(tlcDir, f), "utf8")))
+        .sort(),
+      ["Pay-ChargedAtMostOnce.cfg", "Pay-EventuallyPaying.cfg"],
+    );
+    const expected = node(
+      "statechart.mjs",
+      ["from-spec", "Pay.tla", "--expect-broken", "EventuallyPaying"],
+      dir,
+    );
+    assert.equal(expected.status, 0, expected.stderr);
+    assert.match(expected.stdout, /\n {2}EventuallyPaying is broken \(expected\)\. /);
+  },
+);
+
+test(
+  "from-spec checks a rule that the config lists as both PROPERTY and INVARIANT once, as the INVARIANT, and charts its bug",
+  needsTlc,
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "statechart-"));
+    writeFileSync(
+      join(dir, "Pay.tla"),
+      pay(
+        "Pay",
+        `screen = "Paying" /\\ charges < 2 /\\ charges' = charges + 1 /\\ UNCHANGED screen`,
+      ),
+    );
+    writeFileSync(
+      join(dir, "Pay.cfg"),
+      "SPECIFICATION Spec\nPROPERTY NoDoubleCharge\nINVARIANT NoDoubleCharge\n",
+    );
+    writeFileSync(join(dir, "Pay.map.mjs"), payMap);
+    const r = node("statechart.mjs", ["from-spec", "Pay.tla"], dir);
+    assert.equal(r.status, 1, r.stderr);
+    assert.equal(
+      r.stdout.split("\n\n")[0],
+      `TLC on Pay.tla with Pay.cfg:
+  NoDoubleCharge is broken.
+  TLC ran 3 times in N s.`,
+    );
+    assert.match(r.stdout, /\nRule broken: `NoDoubleCharge`\n/);
+    assert.equal(
+      r.stdout.split("\n").at(-2),
+      "Wrote chart.mmd, bug-1.mmd, stories.md, summary.json in Pay-statechart.",
+    );
+    const unknown = node(
+      "statechart.mjs",
+      ["from-spec", "Pay.tla", "--expect-broken", "Nope"],
+      dir,
+    );
+    assert.match(unknown.stderr, /, whose rules are NoDoubleCharge\.\n/);
+  },
+);
+
+test("from-spec reports a broken PROPERTY in each form that TLC reports it in", needsTlc, () => {
+  const dir = mkdtempSync(join(tmpdir(), "statechart-"));
+  writeFileSync(
+    join(dir, "Pay.tla"),
+    pay(
+      "Pay",
+      `screen = "Paying" /\\ charges < 2 /\\ charges' = charges + 1 /\\ UNCHANGED screen`,
+    ).replace(
+      "====",
+      `ChargedAtMostOnce == [](charges <= 1)\nNeverChargedAgain == [][charges' <= 1]_charges\nStartsPaying == screen = "Paying"\n====`,
+    ),
+  );
+  writeFileSync(
+    join(dir, "Pay.cfg"),
+    "SPECIFICATION Spec\nPROPERTIES ChargedAtMostOnce NeverChargedAgain StartsPaying\n",
+  );
+  writeFileSync(join(dir, "Pay.map.mjs"), payMap);
+  const r = node("statechart.mjs", ["from-spec", "Pay.tla"], dir);
+  assert.equal(r.status, 1, r.stderr);
+  const broken = (p) =>
+    `  ${p} is broken. The chart draws only INVARIANT rules, so read TLC's counterexample in ${join("Pay-statechart", "tlc", `Pay-${p}.out`)}.`;
+  assert.equal(
+    r.stdout.split("\n\n")[0],
+    `TLC on Pay.tla with Pay.cfg:
+  Pay.cfg has no INVARIANT, so the chart marks no state broken.
+${broken("ChargedAtMostOnce")}
+${broken("NeverChargedAgain")}
+${broken("StartsPaying")}
+  TLC ran 4 times in N s.`,
+  );
+});
+
+test(
   "a state reached only after a bug takes the bug's color, and the fix edge leaves the state before the changed step",
   needsTlc,
   () => {
@@ -1274,7 +1487,15 @@ test(
       "Refunded, charged": "wrong",
     });
 
-    const withFix = [...args, "--fixed-dot", "PayFixed.dot", "--fixed-traces", "PayFixed.out"];
+    const withFix = [
+      ...args,
+      "--fixed-dot",
+      "PayFixed.dot",
+      "--fixed-traces",
+      "PayFixed.out",
+      "--fixed-rules",
+      "NoDoubleCharge",
+    ];
     assert.equal(node("tlc-to-chart.mjs", withFix, dir).status, 0);
     const chart = readFileSync(join(dir, "chart.mmd"), "utf8");
     assert.deepEqual(statusOf(chart), {
@@ -1301,7 +1522,7 @@ test(
 );
 
 test(
-  "from-spec writes a mapping to fill in, then draws each bug in every view the mapping has",
+  "a rule that the second model does not check reads not checked, and a rule it checks reads unchanged",
   needsTlc,
   () => {
     const dir = mkdtempSync(join(tmpdir(), "statechart-"));
@@ -1312,22 +1533,78 @@ test(
         `screen = "Paying" /\\ charges < 2 /\\ charges' = charges + 1 /\\ UNCHANGED screen`,
       ),
     );
+    writeFileSync(join(dir, "Pay.cfg"), "SPECIFICATION Spec\nINVARIANT NoDoubleCharge\n");
+    writeFileSync(join(dir, "pay.map.mjs"), payMap);
+    assert.match(tlc(dir, "Pay").stdout, /Invariant NoDoubleCharge is violated/);
+    const story = (...extra) => {
+      const r = node(
+        "tlc-to-chart.mjs",
+        [
+          ...["--dot", "Pay.dot", "--map", "pay.map.mjs", "--traces", "Pay.out"],
+          ...["--against-dot", "Pay.dot", ...extra, "--story", "story.md", "--out", "chart.mmd"],
+        ],
+        dir,
+      );
+      assert.equal(r.status, 0, r.stderr);
+      return readFileSync(join(dir, "story.md"), "utf8");
+    };
+    assert.match(
+      story(),
+      /^In the spec you see the same screens and steps, but the spec does not check this rule\.$/m,
+    );
+    assert.match(
+      story("--against-traces", "Pay.out", "--against-rules", "NoDoubleCharge"),
+      /^In the spec you see the same screens and steps, so the spec does not change this path\.$/m,
+    );
+    const alone = node(
+      "tlc-to-chart.mjs",
+      [
+        "--dot",
+        "Pay.dot",
+        "--map",
+        "pay.map.mjs",
+        "--against-dot",
+        "Pay.dot",
+        "--against-traces",
+        "Pay.out",
+      ],
+      dir,
+    );
+    assert.equal(alone.status, 2);
+    assert.match(alone.stderr, /^--against-traces and --against-rules go together\./);
+  },
+);
+
+test(
+  "from-spec writes a mapping to fill in, then draws each bug in every view the mapping has",
+  needsTlc,
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "statechart-"));
+    writeFileSync(
+      join(dir, "Pay.tla"),
+      pay(
+        "Pay",
+        `screen = "Paying" /\\ charges < 2 /\\ charges' = charges + 1 /\\ UNCHANGED screen`,
+      ).replace("Next ==", 'Wait == screen = "Paying" /\\ UNCHANGED vars\nNext =='),
+    );
     writeFileSync(
       join(dir, "Pay.cfg"),
       "SPECIFICATION Spec\n\\* The reader's rule.\nINVARIANTS\n  NoDoubleCharge\n",
     );
-    const first = node("statechart.mjs", ["from-spec", "Pay.tla"], dir);
+    const first = node("statechart.mjs", ["from-spec", "Pay.tla"], dir, {
+      TLA2TOOLS: join(dir, "no-tlc.jar"),
+    });
     assert.equal(first.status, 2);
-    assert.equal(first.stdout, "TLC on Pay.tla:\n  NoDoubleCharge is broken.\n");
+    assert.equal(first.stdout, "");
     assert.equal(
       first.stderr,
-      "\nWrote Pay.map.mjs. Fill in its labels, then run this command again.\n",
+      "Wrote Pay.map.mjs. Fill in its labels, then run this command again.\n",
     );
     const scaffold = readFileSync(join(dir, "Pay.map.mjs"), "utf8");
     assert.match(scaffold, /^\/\/ Variables: screen, charges\.$/m);
     assert.match(
       scaffold,
-      /^const STEPS = \{\n\tCharge: "Charge",\n\tPay: "Pay",\n\tRefund: "Refund",\n\};$/m,
+      /^const STEPS = \{\n\tCharge: "Charge",\n\tPay: "Pay",\n\tRefund: "Refund",\n\tWait: "Wait",\n\};$/m,
     );
     assert.equal(existsSync(join(dir, "Pay-statechart")), false);
 
@@ -1339,8 +1616,9 @@ test(
     assert.equal(r.status, 1, r.stderr);
     assert.equal(
       r.stdout,
-      `TLC on Pay.tla:
+      `TLC on Pay.tla with Pay.cfg:
   NoDoubleCharge is broken.
+  TLC ran 3 times in N s.
 
 Chart: 5 states and 4 transitions from 5 model states.
 3 work, 2 break a rule.
@@ -1469,6 +1747,8 @@ test(
       "EditFixed.dot",
       "--fixed-traces",
       "EditFixed.out",
+      "--fixed-rules",
+      "NoLostEdit",
     ];
     const r = node(
       "tlc-to-chart.mjs",
@@ -1629,20 +1909,22 @@ export const step = (a) => ({ Save: "you press Save", Retry: "the app tries agai
 export const cause = () => "the app stops after one retry and shows Saved anyway";
 `,
     );
+    const base = [
+      "from-spec",
+      "SaveCode.tla",
+      "--against",
+      "SaveAgreed.tla",
+      "--label",
+      "the agreed chart",
+    ];
+    const noCfg = node("statechart.mjs", base, dir);
+    assert.equal(noCfg.status, 2);
+    assert.equal(
+      noCfg.stderr,
+      "SaveAgreed.cfg does not exist. Pass --against-config with the config to check SaveAgreed.tla with. The configs beside it: SaveCode.cfg.\n",
+    );
     const run = (...extra) =>
-      node(
-        "statechart.mjs",
-        [
-          "from-spec",
-          "SaveCode.tla",
-          "--against",
-          "SaveAgreed.tla",
-          "--label",
-          "the agreed chart",
-          ...extra,
-        ],
-        dir,
-      );
+      node("statechart.mjs", [...base, "--against-config", "SaveCode.cfg", ...extra], dir);
 
     const unknown = run("--expect-broken", "NoLostNote");
     assert.equal(unknown.status, 2);
@@ -1655,12 +1937,14 @@ export const cause = () => "the app stops after one retry and shows Saved anyway
     assert.equal(expected.status, 0, expected.stderr);
     assert.equal(
       expected.stdout,
-      `TLC on SaveCode.tla:
+      `TLC on SaveCode.tla with SaveCode.cfg:
   TypeOK holds.
   NoFalseSaved is broken (expected).
-TLC on SaveAgreed.tla:
+  TLC ran 4 times in N s.
+TLC on SaveAgreed.tla with SaveCode.cfg:
   TypeOK holds.
   NoFalseSaved holds.
+  TLC ran 3 times in N s.
 
 Chart: 4 states and 4 transitions from 10 model states.
 3 work, 1 breaks a rule, 0 only in the agreed chart.
@@ -1682,6 +1966,14 @@ Broken as expected: NoFalseSaved.
 Wrote chart.mmd, bug-1.mmd, stories.md, summary.json in SaveCode-statechart.
 `,
     );
+    const uncitedWarning = `SaveCode.tla: TypeOK holds, but a rule can also hold because the model waits for a condition that the code does not check. No comment gives the file and line of the code that checks these conditions:
+  SaveCode.tla:8 Retry: screen = "Saving"
+  SaveCode.tla:9 TimeOut: retries = 1
+Put that file and line in a comment on each condition, as in \\* pay.ts:120, or remove the condition when no code checks it.
+`;
+    const warnings = `No config beside SaveAgreed.tla has an "\\* expect:" line for SaveAgreed, so the stories cannot say whether SaveAgreed already lists each bug. When SaveAgreed.tla is a copy, pass the spec in its own folder.
+${uncitedWarning}`;
+    assert.equal(expected.stderr, warnings);
     const out = join(dir, "SaveCode-statechart");
     const chart = readFileSync(join(out, "chart.mmd"), "utf8");
     assert.match(chart, /^stateDiagram-v2\n {2}%% second model \(against\): the agreed chart\n/m);
@@ -1704,6 +1996,13 @@ Wrote chart.mmd, bug-1.mmd, stories.md, summary.json in SaveCode-statechart.
     assert.deepEqual(summary.second.lacks.sort(), ["note.rev", "retries"]);
     assert.equal(summary.classes[0].against, "Saving, draft");
     assert.deepEqual(summary.codeLike, []);
+    assert.deepEqual(summary.uncited, {
+      "SaveCode.tla": [
+        { line: 8, action: "Retry", condition: 'screen = "Saving"' },
+        { line: 9, action: "TimeOut", condition: "retries = 1" },
+      ],
+    });
+    assert.equal(summary.second.listed, undefined);
 
     const unexpected = run();
     assert.equal(unexpected.status, 1, unexpected.stderr);
@@ -1730,6 +2029,92 @@ Wrote chart.mmd, bug-1.mmd, stories.md, summary.json in SaveCode-statechart.
     assert.match(
       coded.stdout,
       /These labels or causes read like code\. Write them in the reader's words in code\.map\.mjs:\n {2}retryCount hit maxRetries\n/,
+    );
+
+    writeFileSync(
+      join(dir, "rev.map.mjs"),
+      readFileSync(join(dir, "SaveCode.map.mjs"), "utf8").replace(
+        "${v.note.text}`",
+        "${v.note.text} r${v.note.rev}`",
+      ),
+    );
+    const lacks = run("--map", "rev.map.mjs", "--expect-broken", "NoFalseSaved");
+    assert.equal(lacks.status, 2);
+    assert.equal(
+      lacks.stderr,
+      `${warnings}rev.map.mjs: the agreed chart has no note.rev, and the mapping reads v.note.rev on its states. Label states and steps only from what both models have, or test "rev" in v.note first.\n`,
+    );
+    writeFileSync(
+      join(dir, "rev.map.mjs"),
+      readFileSync(join(dir, "SaveCode.map.mjs"), "utf8").replace(
+        "${v.note.text}`",
+        '${v.note.text}${"rev" in v.note ? ` r${v.note.rev}` : ""}`',
+      ),
+    );
+    const tested = run("--map", "rev.map.mjs", "--expect-broken", "NoFalseSaved");
+    assert.equal(tested.status, 0, tested.stderr);
+
+    writeFileSync(
+      join(dir, "SaveBoth.cfg"),
+      "SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT NoFalseSaved\nPROPERTY NoFalseSaved\n",
+    );
+    const both = node(
+      "statechart.mjs",
+      [
+        ...base,
+        "--config",
+        "SaveBoth.cfg",
+        "--against-config",
+        "SaveBoth.cfg",
+        "--expect-broken",
+        "NoFalseSaved",
+      ],
+      dir,
+    );
+    assert.equal(both.status, 0, both.stderr);
+    assert.equal(both.stderr, warnings);
+
+    writeFileSync(join(dir, "SaveAgreedType.cfg"), "SPECIFICATION Spec\nINVARIANT TypeOK\n");
+    const unchecked = node(
+      "statechart.mjs",
+      [...base, "--against-config", "SaveAgreedType.cfg", "--expect-broken", "NoFalseSaved"],
+      dir,
+    );
+    assert.equal(unchecked.status, 0, unchecked.stderr);
+    assert.match(
+      unchecked.stdout,
+      /^TLC on SaveAgreed\.tla with SaveAgreedType\.cfg:\n {2}TypeOK holds\.\n/m,
+    );
+    assert.equal(
+      unchecked.stderr,
+      `SaveAgreedType.cfg does not check NoFalseSaved, so the stories cannot say whether SaveAgreed.tla keeps it.\n${warnings}`,
+    );
+
+    const listedCfg = (rule) =>
+      writeFileSync(
+        join(dir, "SaveAgreedBug.cfg"),
+        `\\* module: SaveAgreed\n\\* expect: ${rule}\nSPECIFICATION Spec\nINVARIANT ${rule}\n`,
+      );
+    listedCfg("NoFalseSaved");
+    const known = run("--expect-broken", "NoFalseSaved");
+    assert.equal(known.status, 0, known.stderr);
+    assert.equal(known.stderr, uncitedWarning);
+    assert.match(
+      known.stdout,
+      /\nWhy: .*\nListed: SaveAgreedBug\.cfg, a config of SaveAgreed\.tla, expects TLC to break this rule\.\n/,
+    );
+    const listedSummary = JSON.parse(readFileSync(join(out, "summary.json"), "utf8"));
+    assert.deepEqual(listedSummary.second.listed, {
+      spec: "SaveAgreed.tla",
+      breaks: { "SaveAgreedBug.cfg": "NoFalseSaved" },
+    });
+    assert.deepEqual(listedSummary.classes[0].listed, ["SaveAgreedBug.cfg"]);
+    listedCfg("TypeOK");
+    const fresh = run("--expect-broken", "NoFalseSaved");
+    assert.equal(fresh.status, 0, fresh.stderr);
+    assert.match(
+      fresh.stdout,
+      /\nNot listed: no config of SaveAgreed\.tla expects TLC to break this rule\. Its configs expect TLC to break `TypeOK`\.\n/,
     );
   },
 );
@@ -2455,7 +2840,11 @@ test(
 
     writeSlowPay(dir, 200, "Receipt");
     const second = node("statechart.mjs", ["from-spec", "Pay.tla"], dir);
-    process.kill(-first.child.pid, "SIGKILL");
+    try {
+      process.kill(-first.child.pid, "SIGKILL");
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
     assert.equal(second.status, 0, second.stderr);
     for (const file of ["chart.mmd", join("tlc", "Pay.dot")]) {
       const text = readFileSync(join(out, file), "utf8");
@@ -2478,10 +2867,10 @@ const changedMidRun = async ({ wrap = [], env = {} }) => {
   const [paid, receipt] = await Promise.all([first.done, second.done]);
   assert.equal(receipt.status, 0, receipt.stderr);
   assert.equal(paid.status, 2, paid.stderr);
-  assert.equal(
-    paid.stderr,
-    "Pay.tla changed while this run read it, so the run left Pay-statechart as it was. Run the command again.\n",
+  const [, kept] = paid.stderr.match(
+    /^Pay\.tla changed while this run read it, so the run left Pay-statechart as it was\. Run the command again\. The files that this run wrote are in (tmp-a\/statechart-\w+)\.\n$/,
   );
+  assert.match(readFileSync(join(dir, kept, "chart.mmd"), "utf8"), /Paid/);
   const chart = readFileSync(join(out, "chart.mmd"), "utf8");
   assert.match(chart, /Receipt/);
   assert.doesNotMatch(chart, /Paid/);
@@ -2538,9 +2927,9 @@ test(
     writeFileSync(join(out, "notes.md"), "mine\n");
     const r = await run.done;
     assert.equal(r.status, 2);
-    assert.equal(
+    assert.match(
       r.stderr,
-      "Pay-statechart has a file that this command did not write: notes.md. A run puts its files in place of the whole output folder, so pass --out with a new folder.\n",
+      /^Pay-statechart has a file that this command did not write: notes\.md\. A run puts its files in place of the whole output folder, so pass --out with a new folder\. The files that this run wrote are in tmp\/statechart-\w+\.\n$/,
     );
     assert.deepEqual(readdirSync(out), ["notes.md"]);
     assert.deepEqual(staged(dir), []);
@@ -2552,12 +2941,18 @@ const failRenames = `#define _GNU_SOURCE
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 static size_t hits;
 int rename(const char *from, const char *to) {
   static int (*real)(const char *, const char *);
   if (!real) real = dlsym(RTLD_NEXT, "rename");
   const char *base = strrchr(to, '/'), *fails = getenv("RENAME_FAILS");
+  const char *cannot = getenv("RENAME_CANNOT");
   base = base ? base + 1 : to;
+  if (cannot && strstr(base, "shared")) {
+    errno = strcmp(cannot, "EXDEV") == 0 ? EXDEV : access(to, F_OK) == 0 ? EISDIR : ENOSYS;
+    return -1;
+  }
   if (fails && strcmp(base, "shared") == 0 && hits < strlen(fails)) {
     errno = fails[hits++] == 'N' ? ENOTEMPTY : EIO;
     return -1;
@@ -2588,23 +2983,129 @@ test(
 
     const back = run("NI");
     assert.equal(back.status, 2, back.stderr);
-    assert.match(
-      back.stderr,
-      /^cannot replace shared: EIO: .*\. The run left shared as it was\.\n$/,
+    const [, kept] = back.stderr.match(
+      /^cannot replace shared: EIO: .*\. The run left shared as it was\. The files that this run wrote are in (\/\S+)\.\n$/,
     );
+    assert.equal(readFileSync(join(kept, "chart.mmd"), "utf8"), chart);
     assert.equal(readFileSync(join(shared, "chart.mmd"), "utf8"), chart);
     assert.deepEqual(staged(dir), []);
 
     const stuck = run("NII");
     assert.equal(stuck.status, 2, stuck.stderr);
     const named = stuck.stderr.match(
-      /^cannot replace shared: EIO: .*\. This run moved the previous shared to (\.shared-\w+-old) and could not put it back\.\n$/,
+      /^cannot replace shared: EIO: .*\. This run moved the previous shared to (\.shared-\w+-old) and could not put it back\. The files that this run wrote are in \/\S+\.\n$/,
     );
     assert.ok(named, stuck.stderr);
     const aside = named[1];
     assert.equal(existsSync(shared), false);
     assert.equal(readFileSync(join(dir, aside, "chart.mmd"), "utf8"), chart);
     assert.deepEqual(staged(dir), [aside]);
+  },
+);
+
+test(
+  "a run on a filesystem that cannot rename copies its files into place",
+  { skip: needsTlc.skip || (!failingRenames && "cannot compile a rename preload") },
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "statechart-"));
+    writeLamp(dir);
+    const args = ["from-spec", "Lamp.tla", "--out", "shared"];
+    for (const [cannot, label] of [
+      ["ENOSYS", "you flip the switch"],
+      ["EXDEV", "you press the switch"],
+      ["ENOSYS", "you tap the switch"],
+    ]) {
+      writeFileSync(
+        join(dir, "Lamp.map.mjs"),
+        `export const state = (v) => (v.on ? "On" : "Off");\nexport const step = () => "${label}";\n`,
+      );
+      const r = node("statechart.mjs", args, dir, {
+        LD_PRELOAD: failingRenames,
+        RENAME_CANNOT: cannot,
+      });
+      assert.equal(r.status, 0, r.stderr);
+      assert.match(readFileSync(join(dir, "shared", "chart.mmd"), "utf8"), new RegExp(label));
+      assert.deepEqual(staged(dir), []);
+    }
+  },
+);
+
+test(
+  "a run whose input changes before --png renders stops before it renders, and keeps its files",
+  needsTlc,
+  async () => {
+    const dir = mkdtempSync(join(tmpdir(), "statechart-"));
+    writeSlowPay(dir, 20000);
+    const bin = ownTmp(dir, "bin");
+    const rendered = join(dir, "rendered");
+    writeFileSync(join(bin, "npx"), `#!/bin/sh\ntouch "${rendered}"\nexit 1\n`, { mode: 0o755 });
+    const tmp = ownTmp(dir, "tmp");
+    const run = startRun(dir, {
+      args: ["from-spec", "Pay.tla", "--png"],
+      env: { TMPDIR: tmp, PATH: `${bin}${delimiter}${process.env.PATH}` },
+    });
+    await until(() => tlcStarted(tmp));
+    const map = join(dir, "Pay.map.mjs");
+    writeFileSync(map, `${readFileSync(map, "utf8")}// edited\n`);
+    const r = await run.done;
+    assert.equal(r.status, 2, r.stderr);
+    const [, kept] = r.stderr.match(
+      /^Pay\.map\.mjs changed while this run read it, so the run left Pay-statechart as it was\. Run the command again\. The files that this run wrote are in (tmp\/statechart-\w+)\.\n$/,
+    );
+    assert.ok(existsSync(join(dir, kept, "chart.mmd")));
+    assert.equal(existsSync(rendered), false);
+  },
+);
+
+test(
+  "a rule that TLC finds broken before TLC throws a Java exception is broken, and the run draws the paths TLC printed",
+  needsTlc,
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "statechart-"));
+    writeFileSync(
+      join(dir, "Pay.tla"),
+      pay(
+        "Pay",
+        `screen = "Paying" /\\ charges < 2 /\\ charges' = charges + 1 /\\ UNCHANGED screen`,
+      ),
+    );
+    writeFileSync(join(dir, "Pay.cfg"), "SPECIFICATION Spec\nINVARIANT NoDoubleCharge\n");
+    writeFileSync(join(dir, "Pay.map.mjs"), payMap);
+    writeFileSync(
+      join(dir, "crash.txt"),
+      `Error: Invariant NoDoubleCharge is violated.\n${tlcThrew(
+        "java.lang.ArrayIndexOutOfBoundsException",
+        "Index 123 out of bounds for length 4",
+      ).replaceAll("Small", "NoDoubleCharge")}\n${stoppedEarly}`,
+    );
+    const java = join(dir, "java");
+    writeFileSync(
+      java,
+      `#!/bin/sh
+"$REAL_JAVA" "$@" > "$0.$$.out"; s=$?
+if grep -q '^Error: Invariant' "$0.$$.out"; then
+  sed '/^Model checking completed/,$d' "$0.$$.out"; cat "$CRASH"; s=75
+else
+  cat "$0.$$.out"
+fi
+rm "$0.$$.out"
+exit $s
+`,
+      { mode: 0o755 },
+    );
+    const r = node(
+      "statechart.mjs",
+      ["from-spec", "Pay.tla", "--expect-broken", "NoDoubleCharge"],
+      dir,
+      { JAVA: java, TLA2TOOLS: tools.jar, REAL_JAVA: tools.java, CRASH: join(dir, "crash.txt") },
+    );
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /^ {2}NoDoubleCharge is broken \(expected\)\.$/m);
+    assert.match(
+      r.stderr,
+      /^Pay-statechart\/tlc\/Pay-NoDoubleCharge\.out: TLC found that NoDoubleCharge is broken, and then failed with java\.lang\.ArrayIndexOutOfBoundsException: Index 123 out of bounds for length 4\. .* Do not weaken NoDoubleCharge because of it\./m,
+    );
+    assert.match(r.stdout, /^## 1\. Paying, charged twice$/m);
   },
 );
 
@@ -2643,7 +3144,7 @@ exit $s
     for (const line of runs) {
       const [folder, parsed] = line.split(": ");
       assert.ok(folder.startsWith(join(tmp, "tlc-")), line);
-      assert.equal(parsed, `Parsing file ${join(folder, "Naturals.tla")}`);
+      assert.ok(parsed.startsWith(`Parsing file ${folder}/`), line);
       folders.add(folder);
     }
     assert.equal(folders.size, runs.length);
@@ -2739,7 +3240,7 @@ test(
       dir,
     );
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /\nNo rule is broken\.\n/);
+    assert.match(r.stdout, /\nNo state breaks a rule\.\n/);
     for (const [i, [rule, guard, without, story]] of [
       [
         "ChartsOneSpec",

@@ -151,6 +151,183 @@ export function ruleSentences(tla) {
   return out;
 }
 
+export const tlaVariables = (code) =>
+  [...code.matchAll(/\bVARIABLES?\s+(\w+(?:\s*,\s*\w+)*)/g)].flatMap((m) => m[1].split(/\s*,\s*/));
+
+function splitCommentsKeepingOffsets(text) {
+  let code = "";
+  let notes = "";
+  let block = 0;
+  let line = false;
+  let string = false;
+  const put = (c, n) => {
+    code += c;
+    notes += n;
+  };
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    const two = text.slice(i, i + 2);
+    if (c === "\n") {
+      line = string = false;
+      put(c, c);
+    } else if (block) {
+      if (two === "(*" || two === "*)") {
+        block += two === "(*" ? 1 : -1;
+        put("  ", two);
+        i++;
+      } else put(" ", c);
+    } else if (line) put(" ", c);
+    else if (string) {
+      if (c === "\\" && text[i + 1] && text[i + 1] !== "\n") {
+        put(two, "  ");
+        i++;
+      } else {
+        string = c !== '"';
+        put(c, " ");
+      }
+    } else if (two === "\\*" || two === "(*") {
+      if (two === "\\*") line = true;
+      else block = 1;
+      put("  ", two);
+      i++;
+    } else {
+      string = c === '"';
+      put(c, " ");
+    }
+  }
+  return { code, notes };
+}
+
+const IDENTIFIER = /(?<![\\.\w])[A-Za-z_]\w*(?!\w)(?!\s*\|->)/g;
+const CITATION = /[\w./-]+\.[A-Za-z]\w*:\d+|#L\d+/;
+
+const DEPTH = { "(": 1, "[": 1, "{": 1, ")": -1, "]": -1, "}": -1 };
+const LOOSER_THAN_AND = /^(\\\/|=>|<=>|~>|-\+->|\\equiv\b)/;
+const RUNS_TO_END = /^(\\[EA]|IF|LET|CASE|CHOOSE)\b/;
+export const PRIMES_OR_UNCHANGED = /[\w)\]>}]'|\bUNCHANGED\b/;
+
+function conjuncts(bare, from, to, lineStart) {
+  const first = from + bare.slice(from, to).search(/\S/);
+  if (first < from) return null;
+  if (/^\\E\b/.test(bare.slice(first, to))) {
+    for (let i = first, depth = 0; i < to; i++) {
+      depth += DEPTH[bare[i]] ?? 0;
+      if (depth === 0 && bare[i] === ":") return conjuncts(bare, i + 1, to, lineStart);
+    }
+    return null;
+  }
+  if (bare.startsWith("/\\", first)) {
+    const column = first - lineStart(first);
+    const bullets = [first];
+    for (const m of bare.slice(first, to).matchAll(/\n([ \t]*)(?=\S)/g)) {
+      if (m[1].length < column) return null;
+      const at = first + m.index + m[0].length;
+      if (m[1].length === column && bare.startsWith("/\\", at)) bullets.push(at);
+    }
+    return bullets.flatMap((b, i) => {
+      const end = bullets[i + 1] ?? to;
+      return conjuncts(bare, b + 2, end, lineStart) ?? [[b + 2, end]];
+    });
+  }
+  const cuts = [];
+  let depth = 0;
+  for (let i = first; i < to; i++) {
+    const two = bare.slice(i, i + 2);
+    const ahead = bare.slice(i, i + 7);
+    if (two === "<<" || two === ">>") {
+      depth += two === "<<" ? 1 : -1;
+      i++;
+    } else if (DEPTH[bare[i]]) depth += DEPTH[bare[i]];
+    else if (depth > 0) continue;
+    else if (LOOSER_THAN_AND.test(ahead)) return null;
+    else if (!/\w/.test(bare[i - 1] ?? "") && RUNS_TO_END.test(ahead)) break;
+    else if (two === "/\\") cuts.push(i++);
+  }
+  return [first, ...cuts.map((c) => c + 2)].map((a, i) => [a, cuts[i] ?? to]);
+}
+
+export function uncitedConditions(text) {
+  const { code, notes } = splitCommentsKeepingOffsets(text);
+  const bare = code.replace(/"(?:[^"\\\n]|\\.)*"/g, (s) => " ".repeat(s.length));
+  const variables = new Set(tlaVariables(bare));
+  const starts = [0, ...[...bare.matchAll(/\n/g)].map((m) => m.index + 1)];
+  const lineOf = (at) => {
+    let lo = 0;
+    let hi = starts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (starts[mid] <= at) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+  const lineStart = (at) => starts[lineOf(at)];
+  const lines = { bare: bare.split("\n"), notes: notes.split("\n") };
+
+  const defs = new Map();
+  const nextItem = /^(?![ \t\n]|\/\\|\\\/)/gm;
+  for (const m of bare.matchAll(
+    /^(?:LOCAL[ \t]+)?([A-Za-z_]\w*)[ \t]*(?:\([^)]*\)|\[[^\]]*\])?[ \t]*==/gm,
+  )) {
+    const from = m.index + m[0].length;
+    nextItem.lastIndex = from;
+    defs.set(m[1], { from, to: nextItem.exec(bare)?.index ?? bare.length, line: lineOf(m.index) });
+  }
+  const direct = (body) => {
+    const ids = body.match(IDENTIFIER) ?? [];
+    return {
+      reads: ids.filter((id) => variables.has(id)),
+      writes: [...body.matchAll(/(?<![\\.\w])([A-Za-z_]\w*)'/g)]
+        .map((m) => m[1])
+        .filter((id) => variables.has(id)),
+      acts: PRIMES_OR_UNCHANGED.test(body),
+      calls: [...new Set(ids.filter((id) => defs.has(id)))],
+    };
+  };
+  const own = new Map([...defs].map(([name, d]) => [name, direct(bare.slice(d.from, d.to))]));
+  const through = (start) => {
+    const out = { reads: new Set(start.reads), writes: new Set(start.writes), acts: start.acts };
+    const seen = new Set(start.calls);
+    const todo = [...seen];
+    while (todo.length) {
+      const d = own.get(todo.pop());
+      d.reads.forEach((v) => out.reads.add(v));
+      d.writes.forEach((v) => out.writes.add(v));
+      out.acts ||= d.acts;
+      for (const c of d.calls.filter((c) => !seen.has(c))) {
+        seen.add(c);
+        todo.push(c);
+      }
+    }
+    return out;
+  };
+  const cited = (from, to, { above }) => {
+    for (let l = from; l <= to; l++) if (CITATION.test(lines.notes[l])) return true;
+    for (let l = from - 1; above && !lines.bare[l].trim() && lines.notes[l].trim(); l--)
+      if (CITATION.test(lines.notes[l])) return true;
+    return false;
+  };
+
+  const found = [];
+  for (const [action, d] of defs) {
+    if (!own.get(action).acts) continue;
+    const changes = through(own.get(action)).writes;
+    for (const [a, b] of conjuncts(bare, d.from, d.to, lineStart) ?? []) {
+      const part = through(direct(bare.slice(a, b)));
+      if (part.acts || [...part.reads].every((v) => changes.has(v))) continue;
+      const first = lineOf(a + bare.slice(a, b).search(/\S/));
+      const last = lineOf(a + bare.slice(a, b).trimEnd().length - 1);
+      if (cited(first, last, { above: first > d.line })) continue;
+      found.push({
+        line: first + 1,
+        action,
+        condition: code.slice(a, b).replace(/\s+/g, " ").trim(),
+      });
+    }
+  }
+  return found;
+}
+
 function unescapeDot(s) {
   let out = "";
   for (let i = 0; i < s.length; i++) {
@@ -239,24 +416,52 @@ export function parseTraces(text) {
   return traces;
 }
 
+// TLC words a broken PROPERTY by its form: [](state predicate) as an invariant, [][A]_v as an
+// action property, a bare state predicate, which TLC checks only in the initial states, as a
+// property of the initial state, and any other formula as a temporal property.
+export const BROKEN_PROPERTY =
+  /^Error: (Invariant \S+ is violated|Action property \S+ is violated\.|Property \S+ is violated by the initial state:|Temporal properties were violated\.)/m;
+
 // With -continue, TLC prints "Model checking completed" even after broken invariants, and not
-// when it stopped early.
-export function checkTlcOutput(text, file) {
-  const other = text
-    .split("\n")
-    .find(
-      (l) =>
-        l.startsWith("Error: ") &&
-        !/^Error: (Invariant \S+ is violated|The behavior up to this point is)/.test(l),
-    );
+// when it stopped early. TLC can also throw a Java exception of its own while it reports a state
+// that breaks a rule, and stop early. An error in the rule's formula throws one of TLC's own
+// exceptions in place of java.*.
+export function tlcOutputWarning(text, file) {
+  const lines = text.split("\n");
+  const named = (re) => new Set(lines.map((l) => re.exec(l)?.[1]).filter(Boolean));
+  const broken = named(/^Error: Invariant (\S+) is violated/);
+  const failed = [...named(/^Error: Evaluating invariant (\S+) failed\./)];
+  const thrown = [...text.matchAll(/^The exception was a (\S+)\n: (?:([\w.$]+):)?(.*)$/gm)].map(
+    ([, cls, cause, message]) => `${cause ?? cls}: ${message.trim()}`,
+  );
+  const crashed =
+    failed.length > 0 &&
+    failed.every((r) => broken.has(r)) &&
+    thrown.length > 0 &&
+    thrown.every((t) => t.startsWith("java."));
+  const reported = crashed
+    ? /^Error: (Invariant \S+ is violated|The behavior up to this point is|Evaluating invariant \S+ failed\.|TLC threw an unexpected exception\.|The error occurred when TLC was evaluating the nested)/
+    : /^Error: (Invariant \S+ is violated|Action property \S+ is violated\.|Property \S+ is violated by the initial state:|The behavior up to this point is|Temporal properties were violated\.|The following behavior constitutes a counter-example:)/;
+  const other = lines.find((l) => l.startsWith("Error: ") && !reported.test(l));
   if (other)
     throw new Error(
       `${file}: TLC stopped on an error that is not a broken rule: ${other.slice(7)}`,
     );
-  if (!/^Model checking completed\./m.test(text))
+  if (crashed) {
+    const rules = failed.join(", ");
+    return `TLC found that ${rules} ${failed.length === 1 ? "is" : "are"} broken, and then failed with ${thrown[0]}. TLC stopped before it checked every state, so the charts can miss states that break ${rules}. The failure is in TLC, not in the rule. Do not weaken ${rules} because of it. A smaller constant can let TLC finish.`;
+  }
+  // TLC stops at the first broken temporal property, and at an initial state that breaks a
+  // PROPERTY, and then does not print that it completed.
+  if (
+    !/^(Model checking completed\.|Error: (Temporal properties were violated\.|Property \S+ is violated by the initial state:))/m.test(
+      text,
+    )
+  )
     throw new Error(
       `${file}: TLC did not finish, so its counterexamples are not all there; read the file`,
     );
+  return null;
 }
 
 export function wrap(text, width = 26) {
@@ -272,6 +477,9 @@ export function wrap(text, width = 26) {
   if (row) rows.push(row);
   return rows.join("<br/>");
 }
+
+export const joinAnd = (items) =>
+  items.length < 3 ? items.join(" and ") : `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 
 const OPENS_A_PHRASE = new Set(
   "a an the your my our their its this that to of in on at for with from by and or".split(" "),
@@ -296,8 +504,7 @@ const unwrap = (s) =>
     .replace(/\s+/g, " ")
     .trim();
 
-// Mermaid ends a quoted state caption at the first ", so a caption writes " as #quot;.
-export const quote = (s) => String(s).replaceAll('"', "#quot;");
+export const escapeMermaidQuotes = (s) => String(s).replaceAll('"', "#quot;");
 
 export const LEGEND_ID = "legend";
 export const FULL_LABELS = "%% labels in full";
@@ -410,15 +617,14 @@ export function parseMermaid(text) {
       "the chart has -- outside a composite; to make parallel regions, split one top-level composite with --",
     );
 
-  // Ids are global, as in Mermaid: a transition may name a state declared inside another composite.
   function region(p) {
     const out = { states: new Set(), initial: new Set(), transitions: [] };
     const info = new Map();
-    const declared = new Set();
+    const declaredInRegion = new Set();
     (function collect(q) {
       for (const c of q.children) {
         if (c.name === LEGEND_ID) continue;
-        declared.add(c.name);
+        declaredInRegion.add(c.name);
         if (!c.leaf) for (const sub of c.parts) collect(sub);
       }
     })(p);
@@ -432,8 +638,8 @@ export function parseMermaid(text) {
       const local = q.children.filter((c) => c.name !== LEGEND_ID);
       for (const t of q.transitions) {
         for (const end of [t.from, t.to]) {
-          if (end === "[*]" || declared.has(end)) continue;
-          declared.add(end);
+          if (end === "[*]" || declaredInRegion.has(end)) continue;
+          declaredInRegion.add(end);
           local.push({ name: end, leaf: true });
         }
       }
@@ -687,8 +893,7 @@ const rgb = (hex) => {
   const h = hex.length === 4 ? [...hex.slice(1)].map((c) => c + c).join("") : hex.slice(1);
   return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
 };
-// WCAG relative luminance: 0 for black, 1 for white.
-function luminance(hex) {
+function wcagRelativeLuminance(hex) {
   const [r, g, b] = rgb(hex).map((c) => {
     const s = c / 255;
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
@@ -698,7 +903,7 @@ function luminance(hex) {
 export function groupColorProblem(color) {
   if (typeof color !== "string" || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color))
     return 'is not "#rgb" or "#rrggbb"';
-  if (luminance(color) < 0.5) return "is too dark for the status borders to show on it";
+  if (wcagRelativeLuminance(color) < 0.5) return "is too dark for the status borders to show on it";
   return null;
 }
 

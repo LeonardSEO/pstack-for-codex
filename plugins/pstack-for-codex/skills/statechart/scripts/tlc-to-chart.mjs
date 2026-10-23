@@ -8,19 +8,20 @@ import {
   GROUP_PALETTE,
   LEGEND_ID,
   PLAIN_FILL,
-  checkTlcOutput,
   compareCharts,
+  escapeMermaidQuotes,
   groupClassDef,
   groupColorProblem,
   isRecord,
+  joinAnd,
   joinLabels,
   parseDot,
   parseMermaid,
   parseTraces,
   productOf,
-  quote,
   ruleSentences,
   stateKey,
+  tlcOutputWarning,
   wrap,
   STATUS_CLASSES,
 } from "./lib.mjs";
@@ -52,16 +53,30 @@ statechart.mjs runs it once for the overview and once for each bug chart.
                          the reader acts.
   --traces FILE          TLC output that holds counterexamples. Repeat it. TLC -continue gives one
                          per bad state. It refuses a file from a TLC run that stopped early or hit
-                         an error other than a broken rule.
+                         an error other than a broken rule. When TLC found a rule broken and then
+                         failed with a Java exception, it keeps the paths that TLC printed and
+                         warns that the chart can miss states that break the rule.
   --fixed-dot FILE       The state graph of the model with the open fix. Each bug's steps replay
                          on it.
   --fixed-traces FILE    TLC output for the same invariants on the fixed model. Repeat it. It marks
                          states fixed or still wrong, and adds the bugs that only the fixed model
                          has after the current model's bugs.
+  --fixed-rules LIST     The invariants that the fixed model's TLC runs check, as in A,B. It goes
+                         with --fixed-traces. A rule that the fixed model does not check stays
+                         as wrong as it is today, and its stories say "not checked".
   --against-dot FILE     The state graph of the spec that the current code must follow.
                          Each bug's steps replay on it. Do not use it with --fixed-dot.
   --against-traces FILE  TLC output for the spec. Repeat it. Its bugs are drawn wrong, and the
                          bugs that only the spec has number after the code's bugs.
+  --against-rules LIST   The invariants that the spec's TLC runs check. It goes with
+                         --against-traces. Stories of a rule that the spec does not check say
+                         "not checked".
+  --listed JSON          What the spec's configs expect, as in
+                         {"spec":"Spec.tla","breaks":{"A.cfg":"Rule"}}: each config whose
+                         "\\* expect:" line names a rule, and that rule. It goes with
+                         --against-dot. Each story then says whether a config of the spec already
+                         expects TLC to break its rule, and summary.json has second.listed and
+                         each bug's listed configs.
   --label TEXT           The name of the second model in the chart and the stories. Default:
                          "the fix" with --fixed-dot, "the spec" with --against-dot.
   --spec FILE            A TLA+ file whose \\* comment lines above a rule are the rule's sentence in
@@ -100,10 +115,11 @@ take a step that the reader sees.
 
 The second model may have other variables and actions than the current model. Variables and
 record fields that one start state has and the other does not are left out when the two models
-are compared. The second model's states take the current model's start values for the variables
-it does not have, so one mapping draws both. A step of an action that the second model does not
-have is skipped when it changes no shared variable, and matches any step to the same shared state
-when it does.
+are compared. One mapping draws both models, so it may read only what both have. The command
+stops when the mapping reads a variable or field of the current model on a state of the second
+model that lacks it. Test "name" in v first to label such a state another way. A step of an
+action that the second model does not have is skipped when it changes no shared variable, and
+matches any step to the same shared state when it does.
 
 In the customer view, states whose labels read "context: progress" with the same context sit in
 one box named context, and each shows only its progress. A context with one state stays a plain
@@ -148,8 +164,9 @@ Writes only the files that --out, --story, and --summary name.
 
 Exit codes
   0  It wrote the chart.
-  1  It cannot use an input: a mapping without state(), TLC output that it refuses, or a
-     --highlight with no such bug. The error says why.
+  1  It cannot use an input: a mapping without state(), a mapping that reads what the second
+     model lacks, TLC output that it refuses, or a --highlight with no such bug. The error says
+     why.
   2  A bad argument.`;
 const more = "Run node tlc-to-chart.mjs --help for the flags.";
 
@@ -157,6 +174,8 @@ const args = {
   traces: [],
   fixedTraces: [],
   againstTraces: [],
+  fixedRules: [],
+  againstRules: [],
   specs: [],
   view: "customer",
   highlight: 1,
@@ -172,8 +191,11 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a === "--traces") args.traces.push(next());
   else if (a === "--fixed-dot") args.fixedDot = next();
   else if (a === "--fixed-traces") args.fixedTraces.push(next());
+  else if (a === "--fixed-rules") args.fixedRules.push(...next().split(","));
   else if (a === "--against-dot") args.againstDot = next();
   else if (a === "--against-traces") args.againstTraces.push(next());
+  else if (a === "--against-rules") args.againstRules.push(...next().split(","));
+  else if (a === "--listed") args.listed = next();
   else if (a === "--label") args.label = next();
   else if (a === "--spec") args.specs.push(next());
   else if (a === "--view") args.view = next();
@@ -204,6 +226,29 @@ if (!["customer", "developer", "layered"].includes(args.view))
 if (args.fixedDot && args.againstDot) fail("use --fixed-dot or --against-dot, not both.");
 if (args.fixedTraces.length && !args.fixedDot) fail("--fixed-traces needs --fixed-dot.");
 if (args.againstTraces.length && !args.againstDot) fail("--against-traces needs --against-dot.");
+if (!args.fixedTraces.length !== !args.fixedRules.length)
+  fail("--fixed-traces and --fixed-rules go together. The rules are what those TLC runs check.");
+if (!args.againstTraces.length !== !args.againstRules.length)
+  fail(
+    "--against-traces and --against-rules go together. The rules are what those TLC runs check.",
+  );
+if (args.listed !== undefined) {
+  if (!args.againstDot)
+    fail("--listed says what the spec's configs expect; it needs --against-dot.");
+  const shape = `--listed must be JSON such as {"spec":"Spec.tla","breaks":{"A.cfg":"Rule"}}`;
+  try {
+    args.listed = JSON.parse(args.listed);
+  } catch (e) {
+    fail(`${shape}: ${e.message}.`);
+  }
+  const { spec, breaks } = isRecord(args.listed) ? args.listed : {};
+  if (
+    typeof spec !== "string" ||
+    !isRecord(breaks) ||
+    Object.values(breaks).some((r) => typeof r !== "string")
+  )
+    fail(`${shape}.`);
+}
 if (args.label !== undefined && !args.fixedDot && !args.againstDot)
   fail("--label names the second model; it needs --fixed-dot or --against-dot.");
 if (args.proof && !args.regions) fail("--proof writes the regions proof; it needs --regions.");
@@ -292,23 +337,31 @@ function omit(vars, paths) {
   }
   return out;
 }
-function fill(vars, paths, from) {
-  if (!paths.length) return vars;
-  const out = structuredClone(vars);
-  for (const p of paths) {
-    const [o, f] = [holder(out, p), holder(from, p)];
-    if (o && f && p.at(-1) in f) o[p.at(-1)] = structuredClone(f[p.at(-1)]);
-  }
-  return out;
+function guard(vars, paths, at = "v") {
+  if (!paths.length || !isRecord(vars)) return vars;
+  const missing = new Set();
+  const deeper = new Map();
+  for (const [k, ...rest] of paths)
+    if (!rest.length) missing.add(k);
+    else deeper.set(k, [...(deeper.get(k) ?? []), rest]);
+  return new Proxy(vars, {
+    get(target, k) {
+      if (missing.has(k) && !(k in target)) {
+        const name = `${at}.${k}`.slice(2);
+        throw new Error(
+          `${L} has no ${name}, and the mapping reads ${at}.${k} on its states. Label states and steps only from what both models have, or test "${k}" in ${at} first.`,
+        );
+      }
+      return deeper.has(k) ? guard(target[k], deeper.get(k), `${at}.${k}`) : target[k];
+    },
+  });
 }
 
-function modelOf(graph, lookup = (vars) => vars) {
+function modelOf(graph) {
   const byId = new Map([...graph.nodes.keys()].map((id) => [id, new Set()]));
   for (const e of [...graph.edges, ...graph.loops]) byId.get(e.from).add(e.action);
-  const index = new Map(
-    [...graph.nodes.values()].map((n) => [stateKey(n.raw ?? n.vars), byId.get(n.id)]),
-  );
-  const facts = (vars) => factsFrom(index.get(stateKey(lookup(vars))) ?? new Set());
+  const index = new Map([...graph.nodes.values()].map((n) => [stateKey(n.vars), byId.get(n.id)]));
+  const facts = (vars) => factsFrom(index.get(stateKey(vars)) ?? new Set());
   return {
     graph,
     facts,
@@ -356,16 +409,17 @@ const secondGraph = secondDot ? parseDot(fs.readFileSync(secondDot, "utf8")) : n
 const secondInit = secondGraph && [...secondGraph.nodes.values()].find((n) => n.init).vars;
 const lacks = secondGraph ? lacking(mainInit, secondInit) : [];
 const extra = secondGraph ? lacking(secondInit, mainInit) : [];
-const secondFilled = secondGraph && {
-  ...secondGraph,
-  nodes: new Map(
-    [...secondGraph.nodes].map(([id, n]) => [
-      id,
-      { ...n, raw: n.vars, vars: fill(n.vars, lacks, mainInit) },
-    ]),
-  ),
-};
-const second = secondFilled && modelOf(secondFilled, (vars) => omit(vars, lacks));
+const second =
+  secondGraph &&
+  modelOf({
+    ...secondGraph,
+    nodes: new Map(
+      [...secondGraph.nodes].map(([id, n]) => [
+        id,
+        { ...n, raw: n.vars, vars: guard(n.vars, lacks) },
+      ]),
+    ),
+  });
 const secondQ = second && quotient(second);
 
 function readerPath(trace, key, labelOf = stepLabel) {
@@ -461,22 +515,22 @@ function replaySecond(trace) {
       .filter((t) => t.invariant === trace.invariant)
       .map((t) => stateKey(t.steps[t.steps.length - 1].vars)),
   );
-  const ruleHolds =
-    secondTraceFiles.length > 0 && ![...passed].some((id) => bad.has(stateKey(nodeOf(id).vars)));
-  return { sameEnd: true, ruleHolds };
+  const checked = secondRules.has(trace.invariant);
+  const ruleHolds = checked && ![...passed].some((id) => bad.has(stateKey(nodeOf(id).vars)));
+  return { sameEnd: true, checked, ruleHolds };
 }
 
 function readTraces(files, paths = []) {
   return files.flatMap((f) => {
     const text = fs.readFileSync(f, "utf8");
-    checkTlcOutput(text, f);
+    const warning = tlcOutputWarning(text, f);
+    if (warning) console.error(`${f}: ${warning}`);
     return parseTraces(text).map((t) => ({
       ...t,
-      steps: t.steps.map((s) => ({ ...s, vars: fill(s.vars, paths, mainInit) })),
+      steps: t.steps.map((s) => ({ ...s, vars: guard(s.vars, paths) })),
     }));
   });
 }
-// With -continue, TLC reports every bad state, including states after the first bad one.
 function firstBad(raw) {
   const badStates = new Map();
   for (const t of raw) {
@@ -497,6 +551,7 @@ function firstBad(raw) {
 }
 const rawTraces = readTraces(args.traces);
 const secondTraceFiles = role === "fix" ? args.fixedTraces : args.againstTraces;
+const secondRules = new Set(role === "fix" ? args.fixedRules : args.againstRules);
 const rawSecondTraces = readTraces(secondTraceFiles, lacks);
 const traces = firstBad(rawTraces);
 const secondTraces = firstBad(rawSecondTraces);
@@ -592,12 +647,13 @@ function badKeys(m, keys, raw) {
   return out;
 }
 const badNow = badKeys(main, now.keys, rawTraces);
-const badSecond =
-  second && secondTraceFiles.length > 0
-    ? badKeys(second, secondQ.keys, rawSecondTraces)
-    : role === "fix"
-      ? badNow
-      : new Set();
+const uncheckedTraces = rawTraces.filter((t) => !secondRules.has(t.invariant));
+const badSecond = second
+  ? new Set([
+      ...badKeys(second, secondQ.keys, rawSecondTraces),
+      ...(role === "fix" ? badKeys(main, now.keys, uncheckedTraces) : []),
+    ])
+  : new Set();
 const allNodes = new Set([...now.nodes, ...(secondQ?.nodes ?? [])]);
 const initial = new Set([...now.initial, ...(secondQ?.initial ?? [])]);
 const onlySecond = (k) => second && !now.nodes.has(k);
@@ -770,8 +826,6 @@ const groupCounts = (drawn) =>
     }))
     .filter((g) => g.states > 0);
 
-// Mermaid shrinks a chart to the page width unless useMaxWidth is false, and rewraps labels that
-// wrap() already wrapped unless markdownAutoWrap is false.
 const frontMatter = (title) => [
   "---",
   ...(title ? [`title: ${JSON.stringify(title)}`] : []),
@@ -804,7 +858,7 @@ function head(drawn) {
   } else for (const c of STATUS_CLASSES) out.push(`  ${c}`);
   if (legend.length) {
     out.push(`  state "Legend" as ${LEGEND_ID} {`);
-    for (const [id, text] of legend) out.push(`    state "${quote(text)}" as ${id}`);
+    for (const [id, text] of legend) out.push(`    state "${escapeMermaidQuotes(text)}" as ${id}`);
     out.push("  }");
     for (const [id, , c] of legend) out.push(`  class ${id} ${c}`);
   }
@@ -842,7 +896,7 @@ function regionsChart({ states, starts, edges, classes, proofPath, allPath }) {
   const proof = [
     ...frontMatter(),
     "stateDiagram-v2",
-    ...[...ids].map(([s, id]) => `  state "${quote(s)}" as ${id}`),
+    ...[...ids].map(([s, id]) => `  state "${escapeMermaidQuotes(s)}" as ${id}`),
     ...[...flat.Main.initial].map((s) => `  [*] --> ${ids.get(s)}`),
     ...steps.map((s) => `  ${ids.get(bar(s.from))} --> ${ids.get(bar(s.to))} : ${s.label}`),
   ];
@@ -921,10 +975,11 @@ function regionsChart({ states, starts, edges, classes, proofPath, allPath }) {
       if (i) out.push("    --");
       const name = mapping.regionNames?.[i];
       const pad = name ? "      " : "    ";
-      if (name) out.push(`    state "${quote(wrap(name))}" as region${i} {`);
+      if (name) out.push(`    state "${escapeMermaidQuotes(wrap(name))}" as region${i} {`);
       for (const s of new Set(starts.map((k) => split(k)[i])))
         out.push(`${pad}[*] --> ${rid[i].get(s)}`);
-      for (const [s, id] of rid[i]) out.push(`${pad}state "${quote(wrap(s))}" as ${id}`);
+      for (const [s, id] of rid[i])
+        out.push(`${pad}state "${escapeMermaidQuotes(wrap(s))}" as ${id}`);
       const shownMoves = [...moves[i]]
         .filter(([id]) => !only || only[i].has(id))
         .map(([, m]) => m)
@@ -1204,12 +1259,13 @@ for (const [box, members] of boxes) {
 
 const out = head(drawn);
 for (const [box, members] of boxes) {
-  out.push(`  state "${quote(wrap(box))}" as ${boxIds.get(box)} {`);
-  for (const k of members) out.push(`    state "${quote(wrap(caption(k)))}" as ${idOf(k)}`);
+  out.push(`  state "${escapeMermaidQuotes(wrap(box))}" as ${boxIds.get(box)} {`);
+  for (const k of members)
+    out.push(`    state "${escapeMermaidQuotes(wrap(caption(k)))}" as ${idOf(k)}`);
   out.push("  }");
 }
 for (const k of sorted)
-  if (!boxOf.has(k)) out.push(`  state "${quote(wrap(caption(k)))}" as ${idOf(k)}`);
+  if (!boxOf.has(k)) out.push(`  state "${escapeMermaidQuotes(wrap(caption(k)))}" as ${idOf(k)}`);
 for (const k of sorted)
   if (initial.has(k) && (!args.pathOnly || k === chosen?.path[0].key))
     out.push(`  [*] --> ${idOf(k)}`);
@@ -1229,9 +1285,11 @@ function secondLine(c) {
   const s = c.second;
   if (!s) return null;
   if (s.sameEnd)
-    return s.ruleHolds
-      ? `${W} ${L} you see the same screens and steps, yet the rule holds, so the state labels do not show what ${L} changes.`
-      : `${W} ${L} you see the same screens and steps, so ${L} does not change this path.`;
+    return !s.checked
+      ? `${W} ${L} you see the same screens and steps, but ${L} does not check this rule.`
+      : s.ruleHolds
+        ? `${W} ${L} you see the same screens and steps, yet the rule holds, so the state labels do not show what ${L} changes.`
+        : `${W} ${L} you see the same screens and steps, so ${L} does not change this path.`;
   if (s.reason) return `${cap(L)} cannot take these steps: it ${s.reason}.`;
   const outcome = s.disabled
     ? "cannot happen, so you stay at"
@@ -1244,6 +1302,16 @@ function secondLine(c) {
   }
   return `${W} ${L}, step ${s.step} (${s.said}) ${outcome}: ${show(s.key)}.`;
 }
+const listedIn = (c) =>
+  Object.keys(args.listed.breaks).filter((cfg) => args.listed.breaks[cfg] === c.invariant);
+function listedLine(c) {
+  const { spec, breaks } = args.listed;
+  const cfgs = listedIn(c);
+  if (cfgs.length)
+    return `Listed: ${joinAnd(cfgs)}, ${cfgs.length === 1 ? "a config" : "configs"} of ${spec}, expect${cfgs.length === 1 ? "s" : ""} TLC to break this rule.`;
+  const others = [...new Set(Object.values(breaks))].sort().map((r) => `\`${r}\``);
+  return `Not listed: no config of ${spec} expects TLC to break this rule. ${others.length ? `Its configs expect TLC to break ${joinAnd(others)}.` : "None of its configs expects TLC to break a rule."}`;
+}
 if (args.story) {
   const lines = [];
   const header = role === "fix" ? `New with ${L}: ` : `Only in ${L}: `;
@@ -1251,6 +1319,7 @@ if (args.story) {
     lines.push(`## ${i + 1}. ${c.introduced ? header : ""}${show(c.end)}`, "");
     lines.push(`Rule broken: ${ruleOf(c)}`);
     if (c.cause) lines.push(`Why: ${c.cause.replace(/\.$/, "")}.`);
+    if (args.listed) lines.push(listedLine(c));
     lines.push(
       c.count === 1
         ? "This is the only way to get here in the model."
@@ -1282,14 +1351,25 @@ const secondOf = (c) =>
       : `only in ${L}`
     : c.second
       ? c.second.sameEnd
-        ? c.second.ruleHolds
-          ? "same screens, but the rule holds"
-          : "unchanged"
+        ? !c.second.checked
+          ? "same screens, rule not checked"
+          : c.second.ruleHolds
+            ? "same screens, but the rule holds"
+            : "unchanged"
         : (c.second.reason ?? show(c.second.key))
       : null;
 const summary = {
   view: args.view,
-  ...(role ? { second: { role, label: L, lacks: lacks.map((p) => p.join(".")) } } : {}),
+  ...(role
+    ? {
+        second: {
+          role,
+          label: L,
+          lacks: lacks.map((p) => p.join(".")),
+          ...(args.listed ? { listed: args.listed } : {}),
+        },
+      }
+    : {}),
   modelStates: graph.nodes.size,
   modelTransitions: graph.edges.length,
   chartStates: regions?.mermaid ? regions.states[0] + regions.states[1] : flatStates.size,
@@ -1331,6 +1411,7 @@ const summary = {
     modelSteps: c.trace.steps.length,
     counterexamples: c.count,
     [role ?? "fix"]: secondOf(c),
+    ...(args.listed ? { listed: listedIn(c) } : {}),
   })),
   codeLike,
 };
