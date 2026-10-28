@@ -2,10 +2,12 @@
 
 Read the plugin's CODEX-RUNTIME.md.
 
-1. Define a checkable done predicate and the scope authorized by the user.
-2. Drive iterations in the active session using native tool calls. No built-in scheduler or wake mechanism is supplied. If future or recurring execution is requested, use only an available scheduling capability and verify that creation succeeded.
-3. Make the smallest justified change, verify it and keep only improvements. Verify each unit before the next.
-4. Address blockers inside scope. Keep unrelated discoveries as follow-ups. Persist a factual decision trail and a resumable checkpoint before interruption.
-5. Stop when the predicate passes or a real blocker prevents progress. Never relax the predicate or claim work continues after the session ends. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section.
+1. State the exit condition as a checkable predicate before the first iteration (tests green, repro fixed, all N PRs merged, pixel-diff zero).
+2. Pick the wake mechanism using Cursor's `/loop` command (a built-in, not a pstack skill). An event to watch (CI, a merge, a ref advancing) gets a watcher subagent that wakes you on the event, with a long time-based heartbeat as fallback. No event gets a fixed-interval heartbeat sized to when the result is worth re-checking. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section.
+3. Each iteration makes the smallest change the evidence justifies, verifies it against the predicate, commits if it advanced, discards changes that didn't help. Belt-and-suspenders that "might help" gets reverted, not left to ride.
+   Sequence the work via the **sequence-verifiable-units** principle skill, verifying each unit before the next instead of batching checks at the end.
+4. Mid-run discoveries that support the goal are yours. Address broken skills, related bugs, flaky verifiers, review noise, tooling failures, orphaned follow-ups, and fixable drift yourself via poteto-mode. Put out-of-band fixes in their own PR. Do not park reversible work for the human or use `AskQuestion`. Surface only irreversible actions, genuine product or preference calls no experiment can settle, or a real dead end. Keep the predicate as the main drive, and return to it after each side fix.
+5. Checkpoint every iteration via the **show-me-your-work** skill, a row for what changed and whether the predicate moved.
+6. Stop when the predicate is met. A plateau is not a stop, so keep going and pivot your approach to push past it. Surface a genuine dead end rather than spinning, and never relax the predicate to declare victory.
 
 Reply with the predicate, completed iterations, evidence, remaining blockers and checkpoint path.
